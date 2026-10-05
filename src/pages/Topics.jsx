@@ -1,43 +1,59 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Zap, ArrowRight, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { BookOpen, Calculator, ArrowRight, RefreshCw, CheckCircle2, Play } from 'lucide-react';
 import { getTopics, seedDefaultTopic } from '../services/topicsService';
+import { getDashboardStats } from '../services/statsService';
 import { getTopicGenerator } from '../generators';
+import { formatAccuracy, formatSeconds } from '../utils/formatters';
 import EmptyState from '../components/EmptyState';
 import Alert from '../components/Alert';
 
 export default function Topics() {
   const [topics, setTopics] = useState([]);
+  const [topicStats, setTopicStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchTopicsList = async () => {
+  const fetchTopicsAndStats = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await getTopics();
-      if (err && (!data || data.length === 0)) {
-        setError(err.message || 'Failed to load topics from Supabase');
+      const [topicsRes, statsRes] = await Promise.all([
+        getTopics(),
+        getDashboardStats(),
+      ]);
+
+      if (topicsRes.error && (!topicsRes.data || topicsRes.data.length === 0)) {
+        setError(topicsRes.error.message || 'Failed to load topics from database');
       } else {
-        setTopics(data || []);
+        setTopics(topicsRes.data || []);
+      }
+
+      // Map topic performance stats if available
+      if (statsRes?.topicPerformance) {
+        const map = {};
+        statsRes.topicPerformance.forEach((p) => {
+          map[p.id] = p;
+        });
+        setTopicStats(map);
       }
     } catch (e) {
-      setError(e.message || 'Unexpected error loading topics');
+      setError(e.message || 'Unexpected error loading curriculum');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTopicsList();
+    fetchTopicsAndStats();
   }, []);
 
   const handleSeedTopic = async () => {
     setSeeding(true);
     try {
       await seedDefaultTopic();
-      await fetchTopicsList();
+      await fetchTopicsAndStats();
     } catch (err) {
       setError('Could not seed topic to database: ' + err.message);
     } finally {
@@ -46,29 +62,33 @@ export default function Topics() {
   };
 
   return (
-    <div className="space-y-8 py-2">
+    <div className="space-y-6 sm:space-y-8">
       {/* Page Header */}
       <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Exam Topics
+        <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <span>Curriculum Catalog</span>
+          <span>&middot;</span>
+          <span>Syllabus Modules</span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          Study Modules
         </h1>
-        <p className="text-slate-600 text-sm mt-1">
-          Select a topic from your Supabase database to configure and start your speed math drill.
+        <p className="text-sm text-slate-600 mt-1 max-w-2xl">
+          Core quantitative aptitude modules. Master fundamentals through timed drills before advancing to complex multi-step topics.
         </p>
       </div>
 
-      {/* Database sync error notice if any */}
       {error && (
         <Alert variant="warning" title="Database Notice">
-          {error}. Please check your database connection.
+          {error}. Please verify your database connection.
         </Alert>
       )}
 
       {/* Loading State */}
       {loading && (
         <div className="py-16 flex flex-col items-center justify-center space-y-3">
-          <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading topics from Supabase...</p>
+          <RefreshCw className="w-6 h-6 text-brand-600 animate-spin" />
+          <p className="text-xs font-medium text-slate-500">Loading curriculum modules...</p>
         </div>
       )}
 
@@ -77,67 +97,83 @@ export default function Topics() {
         <EmptyState
           icon={BookOpen}
           title="No topics found in Supabase"
-          description="The topics table in your database is empty. Click below to initialize Fast Addition & Subtraction or run schema.sql in Supabase SQL editor."
+          description="The topics table in your database is empty. Click below to initialize Fast Addition & Subtraction or run schema.sql in your Supabase SQL editor."
           actionText={seeding ? 'Initializing...' : 'Seed Fast Addition & Subtraction'}
           onAction={handleSeedTopic}
         />
       )}
 
-      {/* Active Topics List */}
+      {/* Active Modules List */}
       {!loading && topics.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {topics.map((topic) => {
+        <div className="space-y-4">
+          {topics.map((topic, index) => {
             const generator = getTopicGenerator(topic.id) || getTopicGenerator(topic.name);
-            const description =
-              generator?.description ||
-              'Timed calculation drill designed to improve mental calculation speed and accuracy for competitive exams.';
+            const perf = topicStats[topic.id] || topicStats[String(topic.id)] || topicStats['fast-addition-subtraction'] || topicStats['1'];
+            const hasPracticeHistory = Boolean(perf && perf.testsCount > 0);
 
             return (
               <div
                 key={topic.id}
-                className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+                className="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6"
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <div className="space-y-3 flex-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      Module {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-xs font-semibold text-brand-700">
                       {topic.category || 'Quantitative Aptitude'}
                     </span>
-                    <span className="inline-flex items-center text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md">
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                    <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
+                      <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
                       Active
                     </span>
                   </div>
 
-                  <h2 className="text-xl font-bold text-slate-900 mb-2">{topic.name}</h2>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-5">{description}</p>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {topic.name}
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                      {generator?.description ||
+                        'Master rapid mental calculation and near-base adjustments to maximize score speed in aptitude exams.'}
+                    </p>
+                  </div>
 
-                  {/* Generator Features */}
-                  {generator?.config && (
-                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs text-slate-600 space-y-1.5 mb-5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Drill Length:</span>
-                        <span className="font-semibold text-slate-700">5 to 100 Questions</span>
+                  {/* Real Historical Performance or "Not practiced yet" */}
+                  <div className="pt-2 flex flex-wrap items-center gap-4 text-xs">
+                    {hasPracticeHistory ? (
+                      <div className="flex items-center space-x-4 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded">
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Drills Done:</span>
+                          <span className="font-mono font-bold text-slate-800">{perf.testsCount}</span>
+                        </div>
+                        <div className="border-l border-slate-200 pl-3">
+                          <span className="text-slate-400 block text-[10px]">Avg Accuracy:</span>
+                          <span className="font-mono font-bold text-brand-700">{formatAccuracy(perf.accuracy)}</span>
+                        </div>
+                        <div className="border-l border-slate-200 pl-3">
+                          <span className="text-slate-400 block text-[10px]">Avg Speed:</span>
+                          <span className="font-mono font-bold text-slate-800">{formatSeconds(perf.avgTimeMs)}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Operations:</span>
-                        <span className="font-semibold text-slate-700">Addition, Subtraction, Both</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400">Technique Styles:</span>
-                        <span className="font-semibold text-slate-700">Standard, Near-Base Adjustments</span>
-                      </div>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-slate-400 text-xs italic bg-slate-50 border border-slate-100 px-2.5 py-1 rounded">
+                        Not practiced yet
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="pt-2">
+                {/* Direct Action */}
+                <div className="flex-shrink-0 self-start md:self-center">
                   <Link
                     to={`/practice?topic=${encodeURIComponent(topic.id)}`}
-                    className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-indigo-600 text-white font-medium text-sm hover:bg-indigo-700 transition-colors shadow-sm shadow-indigo-100"
+                    className="inline-flex items-center px-4 py-2.5 rounded-md bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-brand-700 transition-colors shadow-xs"
                   >
-                    <Zap className="w-4 h-4 mr-2" />
-                    Configure & Practice
-                    <ArrowRight className="w-4 h-4 ml-1.5" />
+                    <Play className="w-3.5 h-3.5 mr-2 fill-white" />
+                    Configure Drill
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                   </Link>
                 </div>
               </div>

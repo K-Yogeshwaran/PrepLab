@@ -5,20 +5,20 @@ import { HelpCircle, ArrowLeft } from 'lucide-react';
 export default function NotFound() {
   return (
     <div className="py-20 text-center space-y-4">
-      <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
-        <HelpCircle className="w-8 h-8" />
+      <div className="w-12 h-12 rounded-md bg-slate-100 flex items-center justify-center text-slate-400 mx-auto border border-slate-200">
+        <HelpCircle className="w-6 h-6" />
       </div>
-      <h1 className="text-3xl font-extrabold text-slate-900">404 - Page Not Found</h1>
-      <p className="text-sm text-slate-500 max-w-sm mx-auto">
-        The requested page does not exist. Navigate back to the home page or choose a topic to practice.
+      <h1 className="text-2xl font-bold text-slate-900">404 - Page Not Found</h1>
+      <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
+        The requested study page does not exist. Navigate back to the home room or curriculum catalog.
       </p>
       <div>
         <Link
           to="/"
-          className="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+          className="inline-flex items-center px-4 py-2 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-colors shadow-xs"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Back to Study Room
         </Link>
       </div>
     </div>

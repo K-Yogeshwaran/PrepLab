@@ -3,24 +3,24 @@ import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const VARIANTS = {
   error: {
-    container: 'bg-rose-50 border-rose-200 text-rose-800',
+    container: 'bg-rose-50 border-rose-200 text-rose-900',
     icon: AlertCircle,
     iconColor: 'text-rose-600',
   },
   warning: {
-    container: 'bg-amber-50 border-amber-200 text-amber-800',
+    container: 'bg-amber-50 border-amber-200 text-amber-900',
     icon: AlertTriangle,
     iconColor: 'text-amber-600',
   },
   success: {
-    container: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    container: 'bg-emerald-50 border-emerald-200 text-emerald-900',
     icon: CheckCircle,
     iconColor: 'text-emerald-600',
   },
   info: {
-    container: 'bg-blue-50 border-blue-200 text-blue-800',
+    container: 'bg-slate-50 border-slate-200 text-slate-800',
     icon: Info,
-    iconColor: 'text-blue-600',
+    iconColor: 'text-slate-600',
   },
 };
 
@@ -36,21 +36,21 @@ export default function Alert({
 
   return (
     <div
-      className={`border rounded-lg p-4 flex items-start space-x-3 text-sm ${currentVariant.container} ${className}`}
+      className={`border rounded-md p-3.5 flex items-start space-x-3 text-xs ${currentVariant.container} ${className}`}
       role="alert"
     >
-      <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${currentVariant.iconColor}`} />
+      <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${currentVariant.iconColor}`} />
       <div className="flex-1 min-w-0">
-        {title && <h4 className="font-semibold mb-0.5">{title}</h4>}
-        <div className="text-sm leading-relaxed">{children}</div>
+        {title && <h4 className="font-bold mb-0.5 text-xs">{title}</h4>}
+        <div className="text-xs leading-relaxed">{children}</div>
       </div>
       {onDismiss && (
         <button
           onClick={onDismiss}
-          className="text-slate-400 hover:text-slate-600 p-1 rounded transition-colors"
+          className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
           aria-label="Dismiss alert"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       )}
     </div>

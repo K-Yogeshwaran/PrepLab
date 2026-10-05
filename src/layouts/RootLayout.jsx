@@ -1,16 +1,34 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import TopNav from '../components/TopNav';
+import MobileBottomNav from '../components/MobileBottomNav';
 import Footer from '../components/Footer';
 
 export default function RootLayout() {
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
-      <Navbar />
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
-      </main>
-      <Footer />
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row antialiased">
+      {/* 1. Desktop Sidebar (>= 1024px) */}
+      <div className="hidden lg:block lg:flex-shrink-0">
+        <Sidebar />
+      </div>
+
+      {/* 2. Main App Area */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+        {/* Tablet & Mobile Top Header (< 1024px) */}
+        <TopNav />
+
+        {/* Dynamic Page Content */}
+        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-20 md:pb-8">
+          <Outlet />
+        </main>
+
+        {/* Global Footer */}
+        <Footer />
+
+        {/* Mobile Fixed Bottom Navigation Bar (< 768px) */}
+        <MobileBottomNav />
+      </div>
     </div>
   );
 }
