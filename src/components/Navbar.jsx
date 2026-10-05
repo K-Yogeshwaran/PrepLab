@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Zap, BookOpen, BarChart3, Database, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { isSupabaseConfigured } from '../lib/supabase';
+import { Zap, BookOpen, BarChart3, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { useSupabaseConnection } from '../hooks/useSupabaseConnection';
 
 export default function Navbar() {
   const location = useLocation();
-  const configured = isSupabaseConfigured();
+  const { status, errorMessage, retry } = useSupabaseConnection();
 
   const navLinks = [
     { to: '/', label: 'Home' },
@@ -50,31 +50,51 @@ export default function Navbar() {
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  {Icon && <Icon className={`w-4 h-4 mr-1.5 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />}
+                  {Icon && (
+                    <Icon
+                      className={`w-4 h-4 mr-1.5 ${
+                        active ? 'text-indigo-600' : 'text-slate-400'
+                      }`}
+                    />
+                  )}
                   {link.label}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Database Connection Status Pill */}
+          {/* Live Supabase Connection Status Indicator */}
           <div className="hidden md:flex items-center">
-            {configured ? (
+            {status === 'Connected' && (
               <span
-                title="Connected to Supabase PostgreSQL"
+                title="Connected to Supabase PostgreSQL (verified via live query)"
                 className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
               >
                 <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                 Supabase Connected
               </span>
-            ) : (
+            )}
+
+            {status === 'Connecting' && (
               <span
-                title="Supabase is not configured in .env.local. Tests will save to browser storage."
+                title="Verifying database connectivity..."
                 className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
               >
-                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-amber-600" />
-                Local Storage Mode
+                <Loader2 className="w-3.5 h-3.5 mr-1 text-amber-600 animate-spin" />
+                Connecting...
               </span>
+            )}
+
+            {status === 'Connection Error' && (
+              <button
+                type="button"
+                onClick={retry}
+                title={errorMessage || 'Failed to query Supabase. Click to retry.'}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-600" />
+                Connection Error
+              </button>
             )}
           </div>
         </div>

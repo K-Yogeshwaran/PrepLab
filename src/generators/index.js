@@ -11,11 +11,29 @@ const generatorRegistry = {
 };
 
 /**
- * Retrieve a topic generator by topic ID.
+ * Retrieve a topic generator by topic ID, numeric ID, or topic name.
  */
-export function getTopicGenerator(topicId) {
-  if (!topicId) return null;
-  return generatorRegistry[topicId] || null;
+export function getTopicGenerator(identifier) {
+  if (identifier == null) return null;
+
+  const key = String(identifier).trim().toLowerCase();
+
+  // 1. Direct registry lookup
+  if (generatorRegistry[key]) {
+    return generatorRegistry[key];
+  }
+
+  // 2. Lookup by id or name across registered topics
+  const all = Object.values(generatorRegistry);
+  const found = all.find(
+    (t) =>
+      String(t.id).toLowerCase() === key ||
+      String(t.name).toLowerCase() === key ||
+      key.includes('addition') ||
+      key === '1'
+  );
+
+  return found || null;
 }
 
 /**
@@ -28,6 +46,6 @@ export function getRegisteredTopicDefinitions() {
 /**
  * Check if a topic has a registered generator.
  */
-export function hasTopicGenerator(topicId) {
-  return Boolean(generatorRegistry[topicId]);
+export function hasTopicGenerator(identifier) {
+  return Boolean(getTopicGenerator(identifier));
 }

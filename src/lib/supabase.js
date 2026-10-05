@@ -2,11 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // Retrieve environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabasePublishableKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
- * Check whether Supabase environment variables are properly configured
- * and not set to dummy placeholder values.
+ * Check whether Supabase environment variables are present and not placeholder values.
  */
 export function isSupabaseConfigured() {
   if (!supabaseUrl || !supabasePublishableKey) {
@@ -26,21 +26,8 @@ export function isSupabaseConfigured() {
 }
 
 /**
- * Returns diagnostic details about the Supabase configuration.
+ * Single central Supabase client instance.
  */
-export function getSupabaseConfigStatus() {
-  const configured = isSupabaseConfigured();
-  return {
-    isConfigured: configured,
-    hasUrl: Boolean(supabaseUrl && !supabaseUrl.includes('YOUR_SUPABASE')),
-    hasKey: Boolean(supabasePublishableKey && !supabasePublishableKey.includes('YOUR_SUPABASE')),
-    url: supabaseUrl || null,
-  };
-}
-
-// Create the Supabase client instance safely.
-// If credentials are not yet configured, create a dummy or null instance
-// to prevent instant unhandled application crashes on boot.
 export const supabase = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
@@ -49,3 +36,39 @@ export const supabase = isSupabaseConfigured()
       },
     })
   : null;
+
+/**
+ * Performs a lightweight real query to verify live database connectivity and policies.
+ * Returns { connected: boolean, state: 'Connected' | 'Connection Error', error: string | null }
+ */
+export async function verifySupabaseConnection() {
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      connected: false,
+      state: 'Connection Error',
+      error: 'Supabase credentials are not configured in .env.local',
+    };
+  }
+
+  try {
+    const { error } = await supabase.from('topics').select('id').limit(1);
+    if (error) {
+      return {
+        connected: false,
+        state: 'Connection Error',
+        error: error.message || 'Database query error',
+      };
+    }
+    return {
+      connected: true,
+      state: 'Connected',
+      error: null,
+    };
+  } catch (err) {
+    return {
+      connected: false,
+      state: 'Connection Error',
+      error: err.message || 'Network connection failed',
+    };
+  }
+}

@@ -1,26 +1,14 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { getRegisteredTopicDefinitions } from '../generators';
-
-/**
- * Fallback topic metadata matching generator registry
- * Used ONLY when database is offline or unconfigured
- */
-const DEFAULT_TOPIC = {
-  id: 'fast-addition-subtraction',
-  name: 'Fast Addition & Subtraction',
-  category: 'Speed Math',
-};
 
 /**
  * Fetch all available topics from the Supabase `topics` table.
- * Returns { data, error, isFallback }
+ * Returns { data, error }
  */
 export async function getTopics() {
   if (!isSupabaseConfigured() || !supabase) {
     return {
-      data: [DEFAULT_TOPIC],
-      error: new Error('Supabase is not configured. Displaying local topic registry.'),
-      isFallback: true,
+      data: [],
+      error: new Error('Supabase is not configured in .env.local'),
     };
   }
 
@@ -31,38 +19,31 @@ export async function getTopics() {
       .order('created_at', { ascending: true });
 
     if (error) {
-      console.warn('Failed to fetch topics from Supabase:', error.message);
+      console.error('Failed to fetch topics from Supabase:', error.message);
       return {
-        data: [DEFAULT_TOPIC],
+        data: [],
         error,
-        isFallback: true,
       };
     }
 
-    // If table exists but is empty, try seeding the default topic
+    // If topics table is currently empty, attempt to seed default row
     if (!data || data.length === 0) {
       const seeded = await seedDefaultTopic();
       if (seeded) {
-        return { data: [seeded], error: null, isFallback: false };
+        return { data: [seeded], error: null };
       }
-      return {
-        data: [],
-        error: null,
-        isFallback: false,
-      };
+      return { data: [], error: null };
     }
 
     return {
       data,
       error: null,
-      isFallback: false,
     };
   } catch (err) {
     console.error('Exception fetching topics:', err);
     return {
-      data: [DEFAULT_TOPIC],
+      data: [],
       error: err,
-      isFallback: true,
     };
   }
 }
@@ -74,15 +55,7 @@ export async function getTopicById(id) {
   if (!id) return { data: null, error: new Error('Topic ID required') };
 
   if (!isSupabaseConfigured() || !supabase) {
-    const defaultDef = getRegisteredTopicDefinitions().find((t) => t.id === id);
-    if (defaultDef) {
-      return {
-        data: { id: defaultDef.id, name: defaultDef.name, category: defaultDef.category },
-        error: null,
-        isFallback: true,
-      };
-    }
-    return { data: null, error: new Error('Topic not found in local registry') };
+    return { data: null, error: new Error('Supabase is not configured') };
   }
 
   try {
@@ -96,15 +69,7 @@ export async function getTopicById(id) {
       return { data: null, error };
     }
 
-    if (!data) {
-      // Check local registry
-      const local = getRegisteredTopicDefinitions().find((t) => t.id === id);
-      if (local) {
-        return { data: local, error: null, isFallback: true };
-      }
-    }
-
-    return { data, error: null, isFallback: false };
+    return { data, error: null };
   } catch (err) {
     return { data: null, error: err };
   }
@@ -112,31 +77,46 @@ export async function getTopicById(id) {
 
 /**
  * Seeds the initial Fast Addition & Subtraction topic into Supabase
+ * Adaptive to either BIGINT identity or TEXT id column.
  */
 export async function seedDefaultTopic() {
   if (!isSupabaseConfigured() || !supabase) return null;
 
   try {
+    // Attempt 1: Insert without ID (PostgreSQL generates identity)
     const { data, error } = await supabase
       .from('topics')
-      .upsert(
-        [
-          {
-            id: DEFAULT_TOPIC.id,
-            name: DEFAULT_TOPIC.name,
-            category: DEFAULT_TOPIC.category,
-          },
-        ],
-        { onConflict: 'id' }
-      )
+      .insert([
+        {
+          name: 'Fast Addition & Subtraction',
+          category: 'Speed Math',
+        },
+      ])
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      console.warn('Could not seed topic to Supabase:', error.message);
-      return null;
+    if (!error && data) {
+      return data;
     }
-    return data;
+
+    // Attempt 2: If table requires explicit text id
+    const { data: textData, error: textErr } = await supabase
+      .from('topics')
+      .insert([
+        {
+          id: 'fast-addition-subtraction',
+          name: 'Fast Addition & Subtraction',
+          category: 'Speed Math',
+        },
+      ])
+      .select()
+      .maybeSingle();
+
+    if (!textErr && textData) {
+      return textData;
+    }
+
+    return null;
   } catch (err) {
     console.warn('Seed exception:', err);
     return null;

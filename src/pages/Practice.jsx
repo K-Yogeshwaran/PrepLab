@@ -4,19 +4,18 @@ import {
   Zap,
   Play,
   Clock,
-  CheckCircle,
-  XCircle,
-  RotateCcw,
   ArrowRight,
   AlertTriangle,
   Loader2,
   Sliders,
+  RotateCcw,
+  CheckCircle,
 } from 'lucide-react';
 import { getTopicGenerator } from '../generators';
 import { getTopics } from '../services/topicsService';
 import { saveTestAttempt } from '../services/testsService';
 import { useTimer } from '../hooks/useTimer';
-import { formatDuration, formatSeconds } from '../utils/formatters';
+import { formatDuration, formatSeconds, formatAccuracy } from '../utils/formatters';
 import ConfirmModal from '../components/ConfirmModal';
 import Alert from '../components/Alert';
 
@@ -39,14 +38,16 @@ export default function Practice() {
   const [difficulty, setDifficulty] = useState('mixed');
   const [style, setStyle] = useState('mixed');
 
-  // Test Execution State: 'config' | 'in_progress' | 'saving'
+  // Test Execution State: 'config' | 'in_progress' | 'saving' | 'save_error'
   const [testPhase, setTestPhase] = useState('config');
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswerInput, setUserAnswerInput] = useState('');
   const [completedQuestions, setCompletedQuestions] = useState([]);
+  const [completedStats, setCompletedStats] = useState(null);
   const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [isRetryingSave, setIsRetryingSave] = useState(false);
 
   // Abandon Confirmation Modal
   const [showQuitModal, setShowQuitModal] = useState(false);
@@ -63,8 +64,9 @@ export default function Practice() {
         const { data } = await getTopics();
         if (data && data.length > 0) {
           setAvailableTopics(data);
-          // If requested topic is available, keep it, else default to first
-          const found = data.some((t) => t.id === requestedTopicId);
+          const found = data.some(
+            (t) => String(t.id) === requestedTopicId || t.name === requestedTopicId
+          );
           if (found) {
             setTopicId(requestedTopicId);
           } else {
@@ -90,9 +92,9 @@ export default function Practice() {
   // Warn user before refreshing or leaving during an active test
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (testPhase === 'in_progress') {
+      if (testPhase === 'in_progress' || testPhase === 'save_error') {
         e.preventDefault();
-        e.returnValue = 'You have a test in progress. Incomplete tests will not be saved.';
+        e.returnValue = 'You have a test in progress or pending save. Leaving will discard results.';
         return e.returnValue;
       }
     };
@@ -130,6 +132,7 @@ export default function Practice() {
     setCurrentIndex(0);
     setUserAnswerInput('');
     setCompletedQuestions([]);
+    setCompletedStats(null);
     setSaveError(null);
     setTestPhase('in_progress');
 
@@ -173,18 +176,18 @@ export default function Practice() {
       setUserAnswerInput('');
       questionStartTimeRef.current = performance.now();
       setIsSubmittingQuestion(false);
-      // Refocus input
       setTimeout(() => inputRef.current?.focus(), 10);
     } else {
-      // Completed all questions!
-      finishTest(nextCompleted);
+      // Completed all questions -> proceed to persistence
+      finishAndSaveTest(nextCompleted);
     }
   };
 
   /**
-   * Finish and save the completed test attempt
+   * Finish and save completed test to Supabase PostgreSQL.
+   * Strictly avoids localStorage fallback for test attempts.
    */
-  const finishTest = async (allCompleted) => {
+  const finishAndSaveTest = async (allCompleted) => {
     totalTimer.pause();
     setTestPhase('saving');
 
@@ -193,6 +196,15 @@ export default function Practice() {
     const correctCount = allCompleted.filter((q) => q.isCorrect).length;
     const accuracy = totalCount > 0 ? Math.round((correctCount / totalCount) * 1000) / 10 : 0;
     const averageTimeMs = totalCount > 0 ? Math.round(totalTimeMs / totalCount) : 0;
+
+    const stats = {
+      totalTimeMs,
+      totalCount,
+      correctCount,
+      accuracy,
+      averageTimeMs,
+    };
+    setCompletedStats(stats);
 
     try {
       const result = await saveTestAttempt({
@@ -205,47 +217,59 @@ export default function Practice() {
         questionAttempts: allCompleted,
       });
 
-      if (result.error && !result.data) {
-        setSaveError(result.error.message || 'Error saving test results.');
-        setTestPhase('in_progress');
+      if (result.error || !result.data?.test?.id) {
+        setSaveError(
+          result.error?.message ||
+            'Could not persist test results to Supabase. Check database policies and connection.'
+        );
+        setTestPhase('save_error');
         setIsSubmittingQuestion(false);
         return;
       }
 
-      // Navigate to results page
-      const testId = result.data?.test?.id;
-      if (testId) {
-        navigate(`/results/${testId}`, {
-          state: {
-            test: result.data.test,
-            questions: result.data.questions || allCompleted,
-            savedToSupabase: result.savedToSupabase,
-          },
-        });
-      } else {
-        // Fallback navigation with in-memory state
-        navigate(`/results/local`, {
-          state: {
-            test: {
-              id: 'local',
-              topic_id: topicId,
-              question_count: totalCount,
-              correct_count: correctCount,
-              accuracy,
-              total_time_ms: totalTimeMs,
-              average_time_ms: averageTimeMs,
-              created_at: new Date().toISOString(),
-            },
-            questions: allCompleted,
-            savedToSupabase: false,
-          },
-        });
-      }
+      // Successful persistence: navigate to the persisted result URL
+      const persistedId = result.data.test.id;
+      navigate(`/results/${persistedId}`);
     } catch (err) {
       console.error('Error completing test:', err);
       setSaveError(err.message || 'Failed to save test.');
-      setTestPhase('in_progress');
+      setTestPhase('save_error');
       setIsSubmittingQuestion(false);
+    }
+  };
+
+  /**
+   * Retry saving the completed test that is preserved in memory
+   */
+  const handleRetrySave = async () => {
+    if (!completedStats || completedQuestions.length === 0) return;
+    setIsRetryingSave(true);
+    setSaveError(null);
+
+    try {
+      const result = await saveTestAttempt({
+        topicId,
+        questionCount: completedStats.totalCount,
+        correctCount: completedStats.correctCount,
+        accuracy: completedStats.accuracy,
+        totalTimeMs: completedStats.totalTimeMs,
+        averageTimeMs: completedStats.averageTimeMs,
+        questionAttempts: completedQuestions,
+      });
+
+      if (result.error || !result.data?.test?.id) {
+        setSaveError(
+          result.error?.message || 'Database insert failed. Please ensure RLS policies allow inserts.'
+        );
+        setIsRetryingSave(false);
+        return;
+      }
+
+      const persistedId = result.data.test.id;
+      navigate(`/results/${persistedId}`);
+    } catch (err) {
+      setSaveError(err.message || 'Retry failed.');
+      setIsRetryingSave(false);
     }
   };
 
@@ -261,6 +285,8 @@ export default function Practice() {
     setCurrentIndex(0);
     setUserAnswerInput('');
     setCompletedQuestions([]);
+    setCompletedStats(null);
+    setSaveError(null);
     setIsSubmittingQuestion(false);
   };
 
@@ -277,7 +303,7 @@ export default function Practice() {
 
   // Current active question
   const currentQuestion = questions[currentIndex];
-  const progressPercent = questions.length > 0 ? ((currentIndex) / questions.length) * 100 : 0;
+  const progressPercent = questions.length > 0 ? (currentIndex / questions.length) * 100 : 0;
 
   return (
     <div className="max-w-3xl mx-auto py-4">
@@ -426,25 +452,103 @@ export default function Practice() {
         <div className="bg-white rounded-2xl border border-slate-200 p-12 shadow-sm text-center space-y-4">
           <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mx-auto" />
           <h2 className="text-xl font-bold text-slate-900">
-            Saving Your Completed Test...
+            Saving Your Completed Test to Supabase...
           </h2>
           <p className="text-sm text-slate-500 max-w-sm mx-auto">
-            Computing final accuracy, response times, and saving results to your database.
+            Inserting test attempt and question records into your PostgreSQL database.
           </p>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* 3. ACTIVE TEST TAKING PHASE                              */}
+      {/* 3. SAVE ERROR / RETRY SCREEN                             */}
+      {/* ======================================================== */}
+      {testPhase === 'save_error' && completedStats && (
+        <div className="bg-white rounded-2xl border border-rose-200 p-8 shadow-sm space-y-6">
+          <div className="flex items-start space-x-4">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-slate-900">
+                Test Result Could Not Be Saved to Supabase
+              </h2>
+              <p className="text-sm text-rose-700 mt-1">
+                {saveError || 'Database operation failed. Please check your Supabase connection and policies.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+              Preserved in Memory
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">
+              Your test session has been safely preserved in current application memory. Nothing has been lost.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <span className="text-xs text-slate-400 block">Score</span>
+                <span className="font-bold text-slate-800 text-lg">
+                  {completedStats.correctCount} / {completedStats.totalCount}
+                </span>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <span className="text-xs text-slate-400 block">Accuracy</span>
+                <span className="font-bold text-indigo-600 text-lg">
+                  {formatAccuracy(completedStats.accuracy)}
+                </span>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <span className="text-xs text-slate-400 block">Total Time</span>
+                <span className="font-bold text-slate-800 text-lg">
+                  {formatDuration(completedStats.totalTimeMs)}
+                </span>
+              </div>
+              <div className="bg-white p-3 rounded-lg border border-slate-200">
+                <span className="text-xs text-slate-400 block">Avg / Question</span>
+                <span className="font-bold text-slate-800 text-lg">
+                  {formatSeconds(completedStats.averageTimeMs)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleConfirmQuit}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+            >
+              Discard and Start New Test
+            </button>
+            <button
+              type="button"
+              disabled={isRetryingSave}
+              onClick={handleRetrySave}
+              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {isRetryingSave ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Retrying Save...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Retry Saving to Supabase
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 4. ACTIVE TEST TAKING PHASE                              */}
       {/* ======================================================== */}
       {testPhase === 'in_progress' && currentQuestion && (
         <div className="space-y-6">
-          {saveError && (
-            <Alert variant="error" title="Notice">
-              {saveError}
-            </Alert>
-          )}
-
           {/* Top Bar: Progress & Timers */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -504,7 +608,6 @@ export default function Practice() {
                   value={userAnswerInput}
                   disabled={isSubmittingQuestion}
                   onChange={(e) => {
-                    // Allow only digits and optional leading minus
                     const val = e.target.value;
                     if (val === '' || /^-?\d*$/.test(val)) {
                       setUserAnswerInput(val);
@@ -519,7 +622,7 @@ export default function Practice() {
                 <button
                   type="submit"
                   disabled={isSubmittingQuestion}
-                  className="w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-indigo-600 text-white font-semibold text-base hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSubmittingQuestion ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

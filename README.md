@@ -119,53 +119,62 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-or-publishable-key
 2. Open the **SQL Editor** in your Supabase project dashboard.
 3. Paste and run the entire contents of [`supabase/schema.sql`](./supabase/schema.sql).
 
-### Database Schema Overview
+### Database Schema & Row-Level Security (RLS)
 
-#### `topics`
-Stores available practice modules.
+The complete SQL setup is located in [`supabase/schema.sql`](./supabase/schema.sql).
+
+Because PrepLab is a personal, single-user practice application without authentication or a `users` table, Row-Level Security (RLS) is enabled on all tables with explicit policies granting anonymous browser access (`anon` role) for the necessary operations:
+
+- **`topics`**: `SELECT`, `INSERT`
+- **`test_attempts`**: `SELECT`, `INSERT`
+- **`question_attempts`**: `SELECT`, `INSERT`
+
+#### Applying the Schema & Policies in Supabase
+
+1. Open your project in the [Supabase Dashboard](https://supabase.com/dashboard).
+2. Go to the **SQL Editor** tab on the left navigation bar.
+3. Paste and execute the SQL script in [`supabase/schema.sql`](./supabase/schema.sql):
+
 ```sql
-CREATE TABLE topics (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- Enable RLS
+ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE test_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE question_attempts ENABLE ROW LEVEL SECURITY;
+
+-- Clean existing policies
+DROP POLICY IF EXISTS "Allow anon read topics" ON topics;
+DROP POLICY IF EXISTS "Allow anon insert topics" ON topics;
+DROP POLICY IF EXISTS "Allow anon read test_attempts" ON test_attempts;
+DROP POLICY IF EXISTS "Allow anon insert test_attempts" ON test_attempts;
+DROP POLICY IF EXISTS "Allow anon read question_attempts" ON question_attempts;
+DROP POLICY IF EXISTS "Allow anon insert question_attempts" ON question_attempts;
+
+-- Grant required permissions to anon role
+CREATE POLICY "Allow anon read topics" ON topics
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Allow anon insert topics" ON topics
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow anon read test_attempts" ON test_attempts
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Allow anon insert test_attempts" ON test_attempts
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Allow anon read question_attempts" ON question_attempts
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Allow anon insert question_attempts" ON question_attempts
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+-- Seed default Fast Addition & Subtraction topic
+INSERT INTO topics (name, category)
+SELECT 'Fast Addition & Subtraction', 'Speed Math'
+WHERE NOT EXISTS (SELECT 1 FROM topics WHERE name = 'Fast Addition & Subtraction');
 ```
 
-#### `test_attempts`
-Stores completed test sessions.
-```sql
-CREATE TABLE test_attempts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    topic_id TEXT REFERENCES topics(id) ON DELETE SET NULL,
-    question_count INTEGER NOT NULL CHECK (question_count > 0),
-    correct_count INTEGER NOT NULL CHECK (correct_count >= 0),
-    accuracy NUMERIC(5, 2) NOT NULL CHECK (accuracy >= 0 AND accuracy <= 100),
-    total_time_ms BIGINT NOT NULL CHECK (total_time_ms >= 0),
-    average_time_ms BIGINT NOT NULL CHECK (average_time_ms >= 0),
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-```
-
-#### `question_attempts`
-Stores individual question answers and response times.
-```sql
-CREATE TABLE question_attempts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    test_id UUID NOT NULL REFERENCES test_attempts(id) ON DELETE CASCADE,
-    question_number INTEGER NOT NULL CHECK (question_number > 0),
-    operation TEXT NOT NULL,
-    question TEXT NOT NULL,
-    correct_answer INTEGER NOT NULL,
-    user_answer INTEGER,
-    is_correct BOOLEAN NOT NULL,
-    time_taken_ms BIGINT NOT NULL CHECK (time_taken_ms >= 0),
-    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-```
-
-#### Row Level Security (RLS)
-The database enforces RLS with permissive policies for the single-user `anon` role, allowing reads, inserts, and deletes without requiring user authentication or a users table.
+> **Security Architecture Note**: Because this application is intentionally single-user and has no authentication or user login, browser-based Supabase access cannot cryptographically distinguish the owner from another anonymous visitor. This is an intentional architectural trade-off for this personal aptitude training tool. Do not expose private personal data or confidential records.
 
 ---
 

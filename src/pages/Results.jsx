@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import {
   CheckCircle,
   XCircle,
-  Clock,
-  Zap,
-  Target,
   BarChart3,
   RotateCcw,
-  ArrowRight,
-  ShieldCheck,
-  AlertCircle,
   Loader2,
 } from 'lucide-react';
 import { getTestAttemptById } from '../services/testsService';
@@ -19,25 +13,13 @@ import Alert from '../components/Alert';
 
 export default function Results() {
   const { id } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
 
-  // Try to use navigation state if passed from test runner
-  const initialData = location.state?.test ? location.state : null;
-
-  const [testData, setTestData] = useState(initialData?.test || null);
-  const [questions, setQuestions] = useState(initialData?.questions || []);
-  const [loading, setLoading] = useState(!initialData);
+  const [testData, setTestData] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [savedToSupabase, setSavedToSupabase] = useState(initialData?.savedToSupabase ?? true);
 
   useEffect(() => {
-    // If we already have the state from navigation, don't refetch unless missing
-    if (initialData?.test && initialData?.questions?.length > 0) {
-      setLoading(false);
-      return;
-    }
-
     async function loadTest() {
       if (!id) return;
       setLoading(true);
@@ -46,27 +28,26 @@ export default function Results() {
       try {
         const { data, error: fetchErr } = await getTestAttemptById(id);
         if (fetchErr || !data) {
-          setError(fetchErr?.message || 'Could not load test attempt.');
+          setError(fetchErr?.message || 'Could not load test attempt from Supabase.');
         } else {
           setTestData(data.test);
           setQuestions(data.questions || []);
-          setSavedToSupabase(data.source === 'supabase');
         }
       } catch (err) {
-        setError(err.message || 'Error retrieving test results.');
+        setError(err.message || 'Error retrieving test results from Supabase.');
       } finally {
         setLoading(false);
       }
     }
 
     loadTest();
-  }, [id, initialData]);
+  }, [id]);
 
   if (loading) {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        <p className="text-sm font-medium text-slate-500">Loading test results...</p>
+        <p className="text-sm font-medium text-slate-500">Loading test results from Supabase...</p>
       </div>
     );
   }
@@ -74,8 +55,8 @@ export default function Results() {
   if (error || !testData) {
     return (
       <div className="max-w-xl mx-auto py-12 space-y-4">
-        <Alert variant="error" title="Test Not Found">
-          {error || 'Unable to locate this test record. It may not exist or database access failed.'}
+        <Alert variant="error" title="Test Record Not Found">
+          {error || 'Unable to locate this test record in the Supabase database.'}
         </Alert>
         <div className="text-center">
           <Link
@@ -109,7 +90,7 @@ export default function Results() {
               Test Results
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Completed on {formatDateTime(testData.created_at)}
+              Persisted in Supabase &middot; Completed on {formatDateTime(testData.created_at)}
             </p>
           </div>
 
@@ -145,9 +126,15 @@ export default function Results() {
 
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
             <span className="text-xs text-slate-500 font-medium block mb-1">Accuracy</span>
-            <div className={`text-2xl sm:text-3xl font-bold font-mono ${
-              accuracy >= 90 ? 'text-emerald-600' : accuracy >= 70 ? 'text-indigo-600' : 'text-amber-600'
-            }`}>
+            <div
+              className={`text-2xl sm:text-3xl font-bold font-mono ${
+                accuracy >= 90
+                  ? 'text-emerald-600'
+                  : accuracy >= 70
+                  ? 'text-indigo-600'
+                  : 'text-amber-600'
+              }`}
+            >
               {formatAccuracy(accuracy)}
             </div>
             <span className="text-xs text-slate-400 mt-1 block">
@@ -160,9 +147,7 @@ export default function Results() {
             <div className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
               {formatDuration(totalTimeMs)}
             </div>
-            <span className="text-xs text-slate-400 mt-1 block">
-              Entire test
-            </span>
+            <span className="text-xs text-slate-400 mt-1 block">Entire test</span>
           </div>
 
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 text-center">
@@ -170,9 +155,7 @@ export default function Results() {
             <div className="text-2xl sm:text-3xl font-bold font-mono text-slate-900">
               {formatSeconds(averageTimeMs)}
             </div>
-            <span className="text-xs text-slate-400 mt-1 block">
-              Per calculation
-            </span>
+            <span className="text-xs text-slate-400 mt-1 block">Per calculation</span>
           </div>
         </div>
       </div>
@@ -183,9 +166,7 @@ export default function Results() {
           <h2 className="text-base font-bold text-slate-900">
             Question Review ({questions.length})
           </h2>
-          <span className="text-xs text-slate-500">
-            Real response breakdown
-          </span>
+          <span className="text-xs text-slate-500">Persisted response breakdown</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -203,10 +184,10 @@ export default function Results() {
             <tbody className="divide-y divide-slate-100">
               {questions.map((q, idx) => {
                 const isCorrect = Boolean(q.is_correct ?? q.isCorrect);
-                const qNum = q.question_number || q.questionNumber || idx + 1;
-                const timeMs = q.time_taken_ms ?? q.timeTakenMs ?? 0;
-                const userAnswer = q.user_answer ?? q.userAnswer;
-                const correctAnswer = q.correct_answer ?? q.correctAnswer;
+                const qNum = q.question_number || idx + 1;
+                const timeMs = q.time_taken_ms || 0;
+                const userAnswer = q.user_answer;
+                const correctAnswer = q.correct_answer;
 
                 return (
                   <tr
@@ -223,7 +204,13 @@ export default function Results() {
                     </td>
                     <td className="py-3 px-4 font-mono">
                       {userAnswer !== null && userAnswer !== undefined ? (
-                        <span className={isCorrect ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-semibold line-through'}>
+                        <span
+                          className={
+                            isCorrect
+                              ? 'text-emerald-700 font-semibold'
+                              : 'text-rose-600 font-semibold line-through'
+                          }
+                        >
                           {userAnswer}
                         </span>
                       ) : (

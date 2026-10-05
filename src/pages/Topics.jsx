@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Zap, ArrowRight, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { BookOpen, Zap, ArrowRight, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getTopics, seedDefaultTopic } from '../services/topicsService';
 import { getTopicGenerator } from '../generators';
 import EmptyState from '../components/EmptyState';
@@ -11,18 +11,16 @@ export default function Topics() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState(null);
-  const [isFallback, setIsFallback] = useState(false);
 
   const fetchTopicsList = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err, isFallback: fallback } = await getTopics();
+      const { data, error: err } = await getTopics();
       if (err && (!data || data.length === 0)) {
-        setError(err.message || 'Failed to load topics');
+        setError(err.message || 'Failed to load topics from Supabase');
       } else {
         setTopics(data || []);
-        setIsFallback(Boolean(fallback));
       }
     } catch (e) {
       setError(e.message || 'Unexpected error loading topics');
@@ -55,14 +53,14 @@ export default function Topics() {
           Exam Topics
         </h1>
         <p className="text-slate-600 text-sm mt-1">
-          Select a topic to configure your practice drill and sharpen calculation reflexes.
+          Select a topic from your Supabase database to configure and start your speed math drill.
         </p>
       </div>
 
       {/* Database sync error notice if any */}
       {error && (
         <Alert variant="warning" title="Database Notice">
-          {error}. Displaying locally registered practice modules.
+          {error}. Please check your database connection.
         </Alert>
       )}
 
@@ -70,7 +68,7 @@ export default function Topics() {
       {loading && (
         <div className="py-16 flex flex-col items-center justify-center space-y-3">
           <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Loading available topics...</p>
+          <p className="text-sm font-medium text-slate-500">Loading topics from Supabase...</p>
         </div>
       )}
 
@@ -78,8 +76,8 @@ export default function Topics() {
       {!loading && topics.length === 0 && (
         <EmptyState
           icon={BookOpen}
-          title="No topics found"
-          description="The topics table in Supabase is empty. Initialize the Fast Addition & Subtraction topic to begin practicing."
+          title="No topics found in Supabase"
+          description="The topics table in your database is empty. Click below to initialize Fast Addition & Subtraction or run schema.sql in Supabase SQL editor."
           actionText={seeding ? 'Initializing...' : 'Seed Fast Addition & Subtraction'}
           onAction={handleSeedTopic}
         />
@@ -89,7 +87,7 @@ export default function Topics() {
       {!loading && topics.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {topics.map((topic) => {
-            const generator = getTopicGenerator(topic.id);
+            const generator = getTopicGenerator(topic.id) || getTopicGenerator(topic.name);
             const description =
               generator?.description ||
               'Timed calculation drill designed to improve mental calculation speed and accuracy for competitive exams.';
@@ -110,14 +108,10 @@ export default function Topics() {
                     </span>
                   </div>
 
-                  <h2 className="text-xl font-bold text-slate-900 mb-2">
-                    {topic.name}
-                  </h2>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                    {description}
-                  </p>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">{topic.name}</h2>
+                  <p className="text-sm text-slate-600 leading-relaxed mb-5">{description}</p>
 
-                  {/* Generator Features if available */}
+                  {/* Generator Features */}
                   {generator?.config && (
                     <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs text-slate-600 space-y-1.5 mb-5">
                       <div className="flex items-center justify-between">

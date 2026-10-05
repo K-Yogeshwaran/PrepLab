@@ -6,11 +6,8 @@ import {
   Clock,
   Target,
   Trophy,
-  ArrowRight,
   TrendingUp,
   RotateCcw,
-  CheckCircle2,
-  Calendar,
   Layers,
   Loader2,
 } from 'lucide-react';
@@ -35,20 +32,25 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    async function loadStats() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getDashboardStats();
+  const loadStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getDashboardStats();
+      if (data.error) {
+        setError(data.error);
+      } else {
         setStats(data);
-      } catch (err) {
-        console.error('Failed to load dashboard statistics:', err);
-        setError('Failed to fetch dashboard statistics.');
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      console.error('Failed to load dashboard statistics:', err);
+      setError('Failed to fetch dashboard statistics from Supabase.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadStats();
   }, []);
 
@@ -56,13 +58,34 @@ export default function Dashboard() {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-3">
         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        <p className="text-sm font-medium text-slate-500">Loading your performance analytics...</p>
+        <p className="text-sm font-medium text-slate-500">
+          Loading your performance analytics from Supabase...
+        </p>
       </div>
     );
   }
 
-  // Proper empty state when no tests have been completed yet
-  // Never show fake 0% charts or fake data
+  if (error) {
+    return (
+      <div className="space-y-6 py-4 max-w-2xl mx-auto">
+        <Alert variant="error" title="Database Connection Notice">
+          {error}. Please verify your Supabase database schema and RLS policies.
+        </Alert>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={loadStats}
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Retry Query
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Meaningful empty state when no attempts exist in Supabase
   if (!stats || !stats.hasData || stats.totalTests === 0) {
     return (
       <div className="space-y-6 py-4">
@@ -96,7 +119,6 @@ export default function Dashboard() {
     recentTests,
     topicPerformance,
     charts,
-    isLocalSource,
   } = stats;
 
   return (
@@ -108,7 +130,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="text-slate-600 text-sm mt-1">
-            Personal aptitude practice analytics computed from your actual test history.
+            Personal aptitude practice analytics computed strictly from your Supabase test history.
           </p>
         </div>
 
@@ -122,12 +144,6 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
-
-      {isLocalSource && (
-        <Alert variant="info" title="Browser Storage Notice">
-          Displaying attempts saved in local browser storage. Connect Supabase in <code className="font-mono text-xs bg-blue-100 px-1 py-0.5 rounded">.env.local</code> for cloud persistence across devices.
-        </Alert>
-      )}
 
       {/* Primary KPI Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -332,7 +348,7 @@ export default function Dashboard() {
                     className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                   >
                     Practice This Topic
-                    <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    <Zap className="w-3.5 h-3.5 ml-1" />
                   </Link>
                 </div>
               </div>
@@ -348,7 +364,7 @@ export default function Dashboard() {
             Recent Practice Attempts
           </h2>
           <span className="text-xs text-slate-500">
-            Latest {recentTests.length} tests
+            Latest {recentTests.length} tests from Supabase
           </span>
         </div>
 
@@ -367,7 +383,12 @@ export default function Dashboard() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {recentTests.map((test) => {
-                const topicName = test.topics?.name || (test.topic_id === 'fast-addition-subtraction' ? 'Fast Addition & Subtraction' : test.topic_id);
+                const topicName =
+                  test.topics?.name ||
+                  (String(test.topic_id) === '1' || String(test.topic_id) === 'fast-addition-subtraction'
+                    ? 'Fast Addition & Subtraction'
+                    : `Topic #${test.topic_id}`);
+
                 return (
                   <tr key={test.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
@@ -380,7 +401,15 @@ export default function Dashboard() {
                       {test.correct_count} / {test.question_count}
                     </td>
                     <td className="py-3 px-4 text-center font-mono font-semibold text-xs">
-                      <span className={test.accuracy >= 90 ? 'text-emerald-600' : test.accuracy >= 70 ? 'text-indigo-600' : 'text-amber-600'}>
+                      <span
+                        className={
+                          test.accuracy >= 90
+                            ? 'text-emerald-600'
+                            : test.accuracy >= 70
+                            ? 'text-indigo-600'
+                            : 'text-amber-600'
+                        }
+                      >
                         {formatAccuracy(test.accuracy)}
                       </span>
                     </td>
@@ -393,7 +422,6 @@ export default function Dashboard() {
                     <td className="py-3 px-4 text-right">
                       <Link
                         to={`/results/${test.id}`}
-                        state={{ test }}
                         className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                       >
                         View Review &rarr;
