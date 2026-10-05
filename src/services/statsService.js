@@ -112,8 +112,8 @@ export async function getDashboardStats() {
 
   const accuracyTrend = [];
   const timeTrend = [];
-
   const topicMap = {};
+  const dailyActivityMap = {};
 
   tests.forEach((test, index) => {
     const qCount = parseInt(test.question_count, 10) || 0;
@@ -132,6 +132,26 @@ export async function getDashboardStats() {
 
     const testLabel = `Drill #${index + 1}`;
     const dateLabel = formatShortDate(test.created_at);
+
+    // Daily activity aggregation for consistency heatmap & streaks
+    const testDate = new Date(test.created_at);
+    const dateKey = `${testDate.getFullYear()}-${String(testDate.getMonth() + 1).padStart(2, '0')}-${String(testDate.getDate()).padStart(2, '0')}`;
+
+    if (!dailyActivityMap[dateKey]) {
+      dailyActivityMap[dateKey] = {
+        dateKey,
+        formattedDate: testDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        drillsCount: 0,
+        questionsCount: 0,
+        correctCount: 0,
+        totalTimeMs: 0,
+      };
+    }
+
+    dailyActivityMap[dateKey].drillsCount += 1;
+    dailyActivityMap[dateKey].questionsCount += qCount;
+    dailyActivityMap[dateKey].correctCount += cCount;
+    dailyActivityMap[dateKey].totalTimeMs += timeMs;
 
     // Chart 1 data point: Accuracy Trend
     accuracyTrend.push({
@@ -154,7 +174,7 @@ export async function getDashboardStats() {
       rawCreatedAt: test.created_at,
     });
 
-    // Topic grouping for Chart 3
+    // Topic grouping
     const topicId = String(test.topic_id || 'unknown');
     const topicName =
       test.topics?.name ||
@@ -180,15 +200,117 @@ export async function getDashboardStats() {
     topicMap[topicId].totalTimeMs += timeMs;
   });
 
+  // Calculate day-level metrics and intensity
+  Object.keys(dailyActivityMap).forEach((key) => {
+    const day = dailyActivityMap[key];
+    day.accuracy = day.questionsCount > 0 ? Math.round((day.correctCount / day.questionsCount) * 1000) / 10 : 0;
+    day.avgTimeMs = day.questionsCount > 0 ? Math.round(day.totalTimeMs / day.questionsCount) : 0;
+    day.avgTimeSeconds = Math.round((day.avgTimeMs / 1000) * 10) / 10;
+
+    // Intensity: 0 = 0, 1-10 = 1, 11-25 = 2, 26-50 = 3, >50 = 4
+    if (day.questionsCount > 50) {
+      day.intensity = 4;
+    } else if (day.questionsCount >= 26) {
+      day.intensity = 3;
+    } else if (day.questionsCount >= 11) {
+      day.intensity = 2;
+    } else if (day.questionsCount >= 1) {
+      day.intensity = 1;
+    } else {
+      day.intensity = 0;
+    }
+  });
+
+  // Streaks Calculation (Real Calendar Days)
+  const sortedDates = Object.keys(dailyActivityMap).sort();
+  const totalActiveDays = sortedDates.length;
+
+  let currentStreak = 0;
+  let longestStreak = 0;
+
+  if (totalActiveDays > 0) {
+    // 1. Longest streak
+    let tempStreak = 1;
+    longestStreak = 1;
+
+    for (let i = 1; i < sortedDates.length; i++) {
+      const prev = new Date(sortedDates[i - 1]);
+      const curr = new Date(sortedDates[i]);
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        tempStreak += 1;
+      } else if (diffDays > 1) {
+        tempStreak = 1;
+      }
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+    }
+
+    // 2. Current streak
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    let checkDate = new Date(now);
+    if (!dailyActivityMap[todayKey]) {
+      // If not practiced today, check if practiced yesterday to keep streak active
+      if (dailyActivityMap[yesterdayKey]) {
+        checkDate = new Date(yesterday);
+      } else {
+        checkDate = null;
+      }
+    }
+
+    if (checkDate) {
+      while (true) {
+        const key = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`;
+        if (dailyActivityMap[key]) {
+          currentStreak += 1;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  // Weekly consistency (Current calendar week Monday to Sunday)
+  const today = new Date();
+  const currentDayOfWeek = (today.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+  const mondayThisWeek = new Date(today);
+  mondayThisWeek.setDate(today.getDate() - currentDayOfWeek);
+
+  const weekDays = [];
+  let daysActiveThisWeek = 0;
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mondayThisWeek);
+    d.setDate(mondayThisWeek.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dayData = dailyActivityMap[key] || null;
+    const isActive = Boolean(dayData && dayData.drillsCount > 0);
+    if (isActive) daysActiveThisWeek += 1;
+
+    const dayName = ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i];
+    const isToday = key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    weekDays.push({
+      dateKey: key,
+      dayName,
+      isToday,
+      isActive,
+      data: dayData,
+    });
+  }
+
   const totalIncorrect = Math.max(0, totalQuestions - totalCorrect);
-
-  // Mathematically accurate overall accuracy: SUM(correct) / SUM(total) * 100
-  const overallAccuracy =
-    totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 1000) / 10 : 0;
-
-  // Mathematically accurate average speed: SUM(total_time_ms) / SUM(questions)
-  const averageTimePerQuestionMs =
-    totalQuestions > 0 ? Math.round(totalTimeMs / totalQuestions) : 0;
+  const overallAccuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 1000) / 10 : 0;
+  const averageTimePerQuestionMs = totalQuestions > 0 ? Math.round(totalTimeMs / totalQuestions) : 0;
 
   const topicPerformance = Object.values(topicMap).map((t) => ({
     ...t,
@@ -202,7 +324,6 @@ export async function getDashboardStats() {
         : 0,
   }));
 
-  // Recent tests (chronologically descending for latest attempts table)
   const recentTests = [...tests].reverse().slice(0, 10);
 
   return {
@@ -220,6 +341,14 @@ export async function getDashboardStats() {
     charts: {
       accuracyTrend,
       timeTrend,
+    },
+    activity: {
+      dailyMap: dailyActivityMap,
+      totalActiveDays,
+      currentStreak,
+      longestStreak,
+      daysActiveThisWeek,
+      weekDays,
     },
   };
 }

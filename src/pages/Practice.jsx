@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   Play,
   Clock,
   ArrowRight,
   AlertTriangle,
   Loader2,
-  Sliders,
   RotateCcw,
-  CheckCircle,
+  X,
 } from 'lucide-react';
 import { getTopicGenerator } from '../generators';
 import { getTopics } from '../services/topicsService';
@@ -22,13 +21,11 @@ export default function Practice() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // Selected topic ID from query params or default
   const requestedTopicId = searchParams.get('topic') || 'fast-addition-subtraction';
   const [topicId, setTopicId] = useState(requestedTopicId);
   const [availableTopics, setAvailableTopics] = useState([]);
   const [loadingTopics, setLoadingTopics] = useState(true);
 
-  // Configuration options state
   const generator = getTopicGenerator(topicId);
   const config = generator?.config;
 
@@ -56,7 +53,6 @@ export default function Practice() {
   const questionStartTimeRef = useRef(0);
   const inputRef = useRef(null);
 
-  // Load topics from database
   useEffect(() => {
     async function loadTopics() {
       try {
@@ -81,19 +77,18 @@ export default function Practice() {
     loadTopics();
   }, [requestedTopicId]);
 
-  // Sync state if query parameter changes
   useEffect(() => {
     if (requestedTopicId) {
       setTopicId(requestedTopicId);
     }
   }, [requestedTopicId]);
 
-  // Warn user before refreshing or leaving during an active test
+  // Warn before unload during active drill
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (testPhase === 'in_progress' || testPhase === 'save_error') {
         e.preventDefault();
-        e.returnValue = 'You have a test in progress or pending save. Leaving will discard results.';
+        e.returnValue = 'You have a drill in progress. Leaving will discard results.';
         return e.returnValue;
       }
     };
@@ -102,16 +97,13 @@ export default function Practice() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [testPhase]);
 
-  // Focus input automatically whenever current question index changes
+  // Auto-focus input
   useEffect(() => {
     if (testPhase === 'in_progress' && inputRef.current) {
       inputRef.current.focus();
     }
   }, [currentIndex, testPhase]);
 
-  /**
-   * Start Test: Generates questions and kicks off the timer
-   */
   const handleStartTest = () => {
     if (!generator) return;
 
@@ -135,18 +127,14 @@ export default function Practice() {
     setSaveError(null);
     setTestPhase('in_progress');
 
-    // Start timers
     totalTimer.reset();
     totalTimer.start();
     questionStartTimeRef.current = performance.now();
   };
 
-  /**
-   * Submits current answer and advances to next question or completes test
-   */
   const handleAnswerSubmit = (e) => {
     if (e) e.preventDefault();
-    if (isSubmittingQuestion) return; // Prevent double submit
+    if (isSubmittingQuestion) return;
 
     setIsSubmittingQuestion(true);
 
@@ -154,7 +142,6 @@ export default function Practice() {
     const timeTakenMs = Math.round(now - questionStartTimeRef.current);
     const currentQ = questions[currentIndex];
 
-    // Parse user input (allow empty/skipped or numeric)
     const trimmed = userAnswerInput.trim();
     const parsedUserAnswer = trimmed === '' ? null : parseInt(trimmed, 10);
     const isCorrect = parsedUserAnswer !== null && parsedUserAnswer === currentQ.correctAnswer;
@@ -170,21 +157,16 @@ export default function Practice() {
     setCompletedQuestions(nextCompleted);
 
     if (currentIndex + 1 < questions.length) {
-      // Advance to next question
       setCurrentIndex((prev) => prev + 1);
       setUserAnswerInput('');
       questionStartTimeRef.current = performance.now();
       setIsSubmittingQuestion(false);
       setTimeout(() => inputRef.current?.focus(), 10);
     } else {
-      // Completed all questions -> proceed to persistence
       finishAndSaveTest(nextCompleted);
     }
   };
 
-  /**
-   * Finish and save completed test strictly to Supabase PostgreSQL
-   */
   const finishAndSaveTest = async (allCompleted) => {
     totalTimer.pause();
     setTestPhase('saving');
@@ -225,7 +207,6 @@ export default function Practice() {
         return;
       }
 
-      // Successful persistence: navigate to the persisted result URL
       const persistedId = result.data.test.id;
       navigate(`/results/${persistedId}`);
     } catch (err) {
@@ -236,9 +217,6 @@ export default function Practice() {
     }
   };
 
-  /**
-   * Retry saving the completed test preserved in memory
-   */
   const handleRetrySave = async () => {
     if (!completedStats || completedQuestions.length === 0) return;
     setIsRetryingSave(true);
@@ -271,9 +249,6 @@ export default function Practice() {
     }
   };
 
-  /**
-   * Handle user abandoning the test
-   */
   const handleConfirmQuit = () => {
     setShowQuitModal(false);
     totalTimer.pause();
@@ -290,9 +265,9 @@ export default function Practice() {
 
   if (!generator && !loadingTopics) {
     return (
-      <div className="max-w-2xl mx-auto py-12">
-        <Alert variant="error" title="Topic Not Supported">
-          The selected topic generator "{topicId}" is not registered in the system.
+      <div className="max-w-xl mx-auto py-12">
+        <Alert variant="error" title="Topic Not Found">
+          The selected topic generator is not registered.
         </Alert>
       </div>
     );
@@ -302,159 +277,149 @@ export default function Practice() {
   const progressPercent = questions.length > 0 ? (currentIndex / questions.length) * 100 : 0;
 
   return (
-    <div className="max-w-3xl mx-auto py-2">
+    <div className="max-w-2xl mx-auto">
       {/* ======================================================== */}
-      {/* 1. CONFIGURATION PHASE (Distraction-free)                */}
+      {/* 1. CONFIGURATION PHASE (Simple, focused choices)          */}
       {/* ======================================================== */}
       {testPhase === 'config' && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 sm:p-7 shadow-xs space-y-7">
-          {/* Header */}
-          <div className="border-b border-slate-100 pb-4">
-            <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <span>Drill Configuration</span>
-              <span>&middot;</span>
-              <span>Speed Math</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-              {generator?.name || 'Fast Addition & Subtraction'}
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              Practice Drill
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-              Select your parameters. Non-repeating question pairs are generated instantly on launch.
+            <p className="text-sm text-slate-500 mt-1">
+              Choose your practice settings and start.
             </p>
           </div>
 
-          {/* Option: Number of Questions */}
-          <div className="space-y-2.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              1. Drill Length
-            </label>
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-              {config?.questionCounts.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => setQuestionCount(count)}
-                  className={`py-2 px-1 text-xs font-mono font-medium rounded border transition-colors ${
-                    questionCount === count
-                      ? 'bg-slate-900 text-white border-slate-900 font-bold'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {count} Qs
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Option: Operation */}
-          <div className="space-y-2.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              2. Operation
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {config?.operations.map((op) => (
-                <button
-                  key={op.id}
-                  type="button"
-                  onClick={() => setOperation(op.id)}
-                  className={`p-3 rounded border text-left transition-colors ${
-                    operation === op.id
-                      ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900 text-slate-950'
-                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-semibold text-xs">{op.label}</span>
-                    <span className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
-                      {op.symbol}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-500">
-                    {op.id === 'both' ? 'Mixed +/- challenges' : `${op.label} drills`}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Option: Difficulty */}
-          <div className="space-y-2.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              3. Difficulty Level
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {config?.difficulties.map((diff) => (
-                <button
-                  key={diff.id}
-                  type="button"
-                  onClick={() => setDifficulty(diff.id)}
-                  className={`p-3 rounded border text-left transition-colors ${
-                    difficulty === diff.id
-                      ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900 text-slate-950'
-                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-800'
-                  }`}
-                >
-                  <div className="font-semibold text-xs mb-0.5">{diff.label}</div>
-                  <div className="text-[11px] text-slate-500">{diff.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Option: Calculation Style */}
-          <div className="space-y-2.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-              4. Calculation Style
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {config?.styles.map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => setStyle(st.id)}
-                  className={`p-3 rounded border text-left transition-colors ${
-                    style === st.id
-                      ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900 text-slate-950'
-                      : 'border-slate-200 hover:border-slate-300 bg-white text-slate-800'
-                  }`}
-                >
-                  <div className="font-semibold text-xs mb-0.5">{st.label}</div>
-                  <div className="text-[11px] text-slate-500 leading-tight">{st.description}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Action Row */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-xs text-slate-500 self-start sm:self-auto font-mono">
-              Est. time: ~{questionCount * 4}s &middot; {questionCount} questions
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-xs space-y-6">
+            {/* Topic Display */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Topic
+              </label>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60 font-semibold text-sm text-slate-900 flex items-center justify-between">
+                <span>{generator?.name || 'Fast Addition & Subtraction'}</span>
+                <span className="text-xs font-medium text-brand-600">Speed Math</span>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleStartTest}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-2.5 rounded-md bg-slate-900 text-white font-semibold text-xs sm:text-sm hover:bg-brand-700 shadow-xs transition-colors"
-            >
-              <Play className="w-3.5 h-3.5 mr-2 fill-white" />
-              Start Practice Drill
-            </button>
+            {/* Question Count */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Question Count
+              </label>
+              <div className="grid grid-cols-5 gap-2">
+                {config?.questionCounts.map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setQuestionCount(count)}
+                    className={`py-2.5 px-2 text-xs font-mono font-bold rounded-xl border transition-all ${
+                      questionCount === count
+                        ? 'bg-brand-600 text-white border-brand-600 shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50'
+                    }`}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Operation */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Operation
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {config?.operations.map((op) => (
+                  <button
+                    key={op.id}
+                    type="button"
+                    onClick={() => setOperation(op.id)}
+                    className={`py-2.5 px-3 rounded-xl border text-center transition-all ${
+                      operation === op.id
+                        ? 'bg-brand-50 border-brand-600 text-brand-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="text-xs">{op.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Difficulty */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Difficulty
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {config?.difficulties.map((diff) => (
+                  <button
+                    key={diff.id}
+                    type="button"
+                    onClick={() => setDifficulty(diff.id)}
+                    className={`py-2.5 px-2 rounded-xl border text-center text-xs transition-all ${
+                      difficulty === diff.id
+                        ? 'bg-brand-50 border-brand-600 text-brand-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50'
+                    }`}
+                  >
+                    {diff.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Style */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Style
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {config?.styles.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setStyle(st.id)}
+                    className={`py-2.5 px-2 rounded-xl border text-center text-xs transition-all ${
+                      style === st.id
+                        ? 'bg-brand-50 border-brand-600 text-brand-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Primary Action Button */}
+            <div className="pt-3">
+              <button
+                type="button"
+                onClick={handleStartTest}
+                className="w-full inline-flex items-center justify-center min-h-[48px] py-3.5 px-6 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 shadow-xs hover:shadow transition-all cursor-pointer"
+              >
+                <Play className="w-4 h-4 mr-2 fill-white" />
+                Start Practice
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* 2. SAVING / PERSISTENCE STATE                            */}
+      {/* 2. SAVING STATE                                          */}
       {/* ======================================================== */}
       {testPhase === 'saving' && (
-        <div className="bg-white border border-slate-200 rounded-lg p-10 text-center space-y-3">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center space-y-3 shadow-xs">
           <Loader2 className="w-8 h-8 text-brand-600 animate-spin mx-auto" />
           <h2 className="text-base font-bold text-slate-900">
-            Saving Attempt to Supabase...
+            Saving results...
           </h2>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Persisting test and question attempt records to your database.
-          </p>
         </div>
       )}
 
@@ -462,66 +427,53 @@ export default function Practice() {
       {/* 3. SAVE ERROR / RETRY SCREEN                             */}
       {/* ======================================================== */}
       {testPhase === 'save_error' && completedStats && (
-        <div className="bg-white border border-rose-200 rounded-lg p-6 shadow-xs space-y-5">
+        <div className="bg-white border border-rose-200 rounded-2xl p-6 shadow-xs space-y-5">
           <div className="flex items-start space-x-3.5">
-            <div className="w-10 h-10 rounded-md bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-bold text-slate-900">
-                Attempt Could Not Be Saved to Supabase
+                Could Not Save to Database
               </h2>
-              <p className="text-xs text-rose-700 mt-0.5">
-                {saveError || 'Database operation failed. Please ensure RLS policies have been executed.'}
+              <p className="text-xs text-rose-600 mt-0.5">
+                {saveError || 'Connection error while persisting drill.'}
               </p>
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded p-3.5 text-xs">
-            <span className="font-semibold text-slate-700 block mb-1">
-              Preserved in Memory
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mt-2">
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <span className="text-[10px] text-slate-400 block">Score</span>
-                <span className="font-bold text-slate-800 font-mono">
-                  {completedStats.correctCount} / {completedStats.totalCount}
-                </span>
-              </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <span className="text-[10px] text-slate-400 block">Accuracy</span>
-                <span className="font-bold text-brand-700 font-mono">
-                  {formatAccuracy(completedStats.accuracy)}
-                </span>
-              </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <span className="text-[10px] text-slate-400 block">Total Time</span>
-                <span className="font-bold text-slate-800 font-mono">
-                  {formatDuration(completedStats.totalTimeMs)}
-                </span>
-              </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <span className="text-[10px] text-slate-400 block">Avg / Question</span>
-                <span className="font-bold text-slate-800 font-mono">
-                  {formatSeconds(completedStats.averageTimeMs)}
-                </span>
-              </div>
+          <div className="bg-slate-50 rounded-xl p-4 text-xs font-mono grid grid-cols-2 sm:grid-cols-4 gap-2 text-center border border-slate-200/60">
+            <div>
+              <span className="text-[10px] text-slate-400 block font-sans">Score</span>
+              <span className="font-bold text-slate-900">{completedStats.correctCount} / {completedStats.totalCount}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-sans">Accuracy</span>
+              <span className="font-bold text-emerald-600">{formatAccuracy(completedStats.accuracy)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-sans">Time</span>
+              <span className="font-bold text-slate-900">{formatDuration(completedStats.totalTimeMs)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] text-slate-400 block font-sans">Avg Speed</span>
+              <span className="font-bold text-slate-900">{formatSeconds(completedStats.averageTimeMs)}</span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-1">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={handleConfirmQuit}
-              className="w-full sm:w-auto px-3.5 py-2 rounded border border-slate-300 text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors"
             >
-              Discard and Start Over
+              Discard
             </button>
             <button
               type="button"
               disabled={isRetryingSave}
               onClick={handleRetrySave}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 transition-colors shadow-xs disabled:opacity-50"
             >
               {isRetryingSave ? (
                 <>
@@ -531,7 +483,7 @@ export default function Practice() {
               ) : (
                 <>
                   <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                  Retry Saving to Supabase
+                  Retry Saving
                 </>
               )}
             </button>
@@ -540,59 +492,51 @@ export default function Practice() {
       )}
 
       {/* ======================================================== */}
-      {/* 4. ACTIVE DRILL RUNNER (Extreme Focus Mode)              */}
+      {/* 4. ACTIVE DRILL RUNNER (Dedicated Study Environment)     */}
       {/* ======================================================== */}
       {testPhase === 'in_progress' && currentQuestion && (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Focused Top Header */}
-          <div className="bg-white border border-slate-200 rounded-lg p-3 sm:p-4 shadow-xs flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Drill
-              </span>
-              <span className="text-base font-bold font-mono text-slate-900">
-                {currentIndex + 1} <span className="text-slate-400 font-normal text-xs">/ {questions.length}</span>
-              </span>
+        <div className="space-y-4 sm:space-y-6 pt-2">
+          {/* Top Bar: Question Counter, Timer, Quit */}
+          <div className="flex items-center justify-between px-1">
+            <div className="text-sm font-semibold text-slate-500">
+              Question <span className="font-bold text-slate-900 font-mono text-base">{currentIndex + 1}</span> of <span className="font-mono">{questions.length}</span>
             </div>
 
             <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1.5 text-slate-700 font-mono text-xs bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-                <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <div className="flex items-center space-x-1 text-slate-600 font-mono text-xs font-medium bg-white px-2.5 py-1 rounded-lg border border-slate-200/80 shadow-xs">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <span>{formatDuration(totalTimer.elapsedMs)}</span>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowQuitModal(true)}
-                className="text-xs font-medium text-slate-400 hover:text-rose-600 transition-colors px-1.5 py-0.5"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                title="Quit practice"
               >
-                Quit
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Subtle Progress Bar */}
-          <div className="w-full bg-slate-200 rounded-full h-1 overflow-hidden">
+          {/* Smooth Progress Bar */}
+          <div className="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-slate-900 h-1 rounded-full transition-all duration-200"
+              className="bg-brand-600 h-1.5 rounded-full transition-all duration-200"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
-          {/* Focused Question Workspace Card */}
-          <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-12 text-center space-y-6 shadow-xs">
-            <div className="text-[11px] font-mono uppercase tracking-widest text-slate-400">
-              {currentQuestion.operation} &middot; {currentQuestion.style}
-            </div>
-
-            {/* Massive Monospace Equation */}
-            <div className="text-4xl sm:text-6xl font-mono font-bold tracking-tight text-slate-900 select-none py-2">
+          {/* Focused Equation Card */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-8 sm:p-14 text-center space-y-8 shadow-xs">
+            {/* Dominant Monospace Equation */}
+            <div className="text-5xl sm:text-7xl font-mono font-bold tracking-tight text-slate-900 select-none py-4">
               {currentQuestion.num1} {currentQuestion.operatorSymbol} {currentQuestion.num2}
             </div>
 
-            {/* Large Keyboard/Touch Answer Input */}
+            {/* Large Comfortable Answer Input */}
             <form onSubmit={handleAnswerSubmit} className="max-w-xs mx-auto space-y-4">
-              <div className="relative">
+              <div>
                 <input
                   ref={inputRef}
                   type="text"
@@ -608,42 +552,42 @@ export default function Practice() {
                     }
                   }}
                   placeholder="?"
-                  className="w-full text-center text-3xl sm:text-4xl font-mono font-bold py-3.5 px-4 rounded-md border-2 border-slate-300 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 outline-hidden transition-all text-slate-900 placeholder:text-slate-300 disabled:opacity-50"
+                  className="w-full text-center text-4xl sm:text-5xl font-mono font-bold py-3.5 px-4 rounded-xl border-2 border-slate-200 focus:border-brand-600 focus:ring-4 focus:ring-brand-100 outline-hidden transition-all text-slate-900 placeholder:text-slate-300 disabled:opacity-50 shadow-xs"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmittingQuestion}
-                className="w-full inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-md bg-slate-900 text-white font-semibold text-sm hover:bg-brand-700 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                className="w-full inline-flex items-center justify-center min-h-[48px] px-6 py-3.5 rounded-xl bg-brand-600 text-white font-semibold text-sm hover:bg-brand-700 transition-colors disabled:opacity-50 cursor-pointer shadow-xs hover:shadow"
               >
                 {isSubmittingQuestion ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : currentIndex + 1 === questions.length ? (
-                  'Complete Drill'
+                  'Complete'
                 ) : (
                   <>
-                    <span>Submit & Next</span>
+                    <span>Next</span>
                     <ArrowRight className="w-4 h-4 ml-1.5" />
                   </>
                 )}
               </button>
 
-              <p className="text-[11px] text-slate-400">
-                Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-600 font-mono text-[10px]">Enter ↵</kbd>
-              </p>
+              <div className="text-xs text-slate-400">
+                Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-500 font-mono text-[10px]">Enter ↵</kbd>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Confirmation Modal when quitting an active test */}
+      {/* Confirmation Modal when quitting */}
       <ConfirmModal
         isOpen={showQuitModal}
-        title="Quit Drill?"
-        message="Are you sure you want to abandon this drill? Incomplete attempts are discarded and not saved."
-        confirmText="Yes, Abandon"
-        cancelText="Resume Drill"
+        title="Abandon Practice?"
+        message="Are you sure you want to stop? Incomplete attempts are discarded."
+        confirmText="Abandon"
+        cancelText="Keep Going"
         variant="danger"
         onConfirm={handleConfirmQuit}
         onCancel={() => setShowQuitModal(false)}

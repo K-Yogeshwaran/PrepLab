@@ -36,7 +36,7 @@ export default function Alert({
 
   return (
     <div
-      className={`border rounded-md p-3.5 flex items-start space-x-3 text-xs ${currentVariant.container} ${className}`}
+      className={`border rounded-xl p-3.5 flex items-start space-x-3 text-xs ${currentVariant.container} ${className}`}
       role="alert"
     >
       <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${currentVariant.iconColor}`} />

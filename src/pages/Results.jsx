@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  CheckCircle,
+  CheckCircle2,
   XCircle,
-  BarChart2,
   RotateCcw,
+  TrendingUp,
   Loader2,
-  BookOpen,
+  Home,
+  Check,
+  X,
 } from 'lucide-react';
 import { getTestAttemptById } from '../services/testsService';
 import { formatDuration, formatSeconds, formatAccuracy, formatDateTime } from '../utils/formatters';
@@ -29,13 +31,13 @@ export default function Results() {
       try {
         const { data, error: fetchErr } = await getTestAttemptById(id);
         if (fetchErr || !data) {
-          setError(fetchErr?.message || 'Could not load test attempt from Supabase.');
+          setError(fetchErr?.message || 'Could not load results from database.');
         } else {
           setTestData(data.test);
           setQuestions(data.questions || []);
         }
       } catch (err) {
-        setError(err.message || 'Error retrieving test results from Supabase.');
+        setError(err.message || 'Error retrieving test results.');
       } finally {
         setLoading(false);
       }
@@ -47,8 +49,8 @@ export default function Results() {
   if (loading) {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-3">
-        <Loader2 className="w-7 h-7 text-brand-600 animate-spin" />
-        <p className="text-xs font-medium text-slate-500">Loading drill diagnostic from Supabase...</p>
+        <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
+        <p className="text-xs text-slate-400">Loading results...</p>
       </div>
     );
   }
@@ -56,15 +58,15 @@ export default function Results() {
   if (error || !testData) {
     return (
       <div className="max-w-xl mx-auto py-12 space-y-4">
-        <Alert variant="error" title="Diagnostic Record Not Found">
-          {error || 'Unable to locate this drill record in the Supabase database.'}
+        <Alert variant="error" title="Result Not Found">
+          {error || 'Unable to locate this result.'}
         </Alert>
         <div className="text-center">
           <Link
             to="/practice"
-            className="inline-flex items-center px-4 py-2 rounded-md bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition-colors"
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 transition-colors"
           >
-            Start a New Practice Drill
+            Start Practice
           </Link>
         </div>
       </div>
@@ -79,171 +81,151 @@ export default function Results() {
   const averageTimeMs = parseInt(testData.average_time_ms, 10) || 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header Diagnostic Card */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-5">
+    <div className="space-y-6 max-w-3xl mx-auto">
+      {/* 1. Results Summary Card */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
           <div>
-            <div className="flex items-center space-x-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              <span>Drill Diagnostic</span>
-              <span>&middot;</span>
-              <span>Supabase Persisted</span>
+            <div className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-1">
+              Practice Summary
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-              Performance Summary
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              Drill Results
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Completed on {formatDateTime(testData.created_at)}
+              {formatDateTime(testData.created_at)}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to="/practice"
-              className="inline-flex items-center px-3.5 py-1.5 rounded-md bg-slate-900 text-white text-xs font-semibold hover:bg-brand-700 transition-colors shadow-xs"
+              className="inline-flex items-center px-4 py-2 rounded-xl bg-brand-600 text-white text-xs sm:text-sm font-semibold hover:bg-brand-700 transition-colors shadow-xs"
             >
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
               Practice Again
             </Link>
             <Link
-              to="/dashboard"
-              className="inline-flex items-center px-3 py-1.5 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors"
+              to="/progress"
+              className="inline-flex items-center px-3.5 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs sm:text-sm font-medium hover:bg-slate-200/70 transition-colors"
             >
-              <BarChart2 className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-              My Progress
+              <TrendingUp className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+              Progress
             </Link>
           </div>
         </div>
 
-        {/* 4 Crisp Key Metric Panels */}
+        {/* 4 Primary Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-slate-50 p-3 rounded border border-slate-200 text-center">
-            <span className="text-[11px] text-slate-400 block font-medium">Score</span>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900 mt-0.5">
-              {correctCount} <span className="text-slate-400 text-sm font-normal">/ {questionCount}</span>
-            </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
-              {incorrectCount} incorrect
-            </span>
-          </div>
-
-          <div className="bg-slate-50 p-3 rounded border border-slate-200 text-center">
-            <span className="text-[11px] text-slate-400 block font-medium">Accuracy</span>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+            <span className="text-xs text-slate-400 block font-medium">Accuracy</span>
             <div
-              className={`text-xl sm:text-2xl font-bold font-mono mt-0.5 ${
+              className={`text-2xl sm:text-3xl font-bold font-mono mt-1 ${
                 accuracy >= 90
-                  ? 'text-emerald-700'
+                  ? 'text-emerald-600'
                   : accuracy >= 70
-                  ? 'text-brand-700'
-                  : 'text-amber-700'
+                  ? 'text-brand-600'
+                  : 'text-amber-600'
               }`}
             >
               {formatAccuracy(accuracy)}
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
-              {accuracy >= 90 ? 'Target Met' : accuracy >= 70 ? 'Satisfactory' : 'Needs Practice'}
-            </span>
           </div>
 
-          <div className="bg-slate-50 p-3 rounded border border-slate-200 text-center">
-            <span className="text-[11px] text-slate-400 block font-medium">Total Duration</span>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900 mt-0.5">
-              {formatDuration(totalTimeMs)}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+            <span className="text-xs text-slate-400 block font-medium">Correct</span>
+            <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-600 mt-1">
+              {correctCount} <span className="text-slate-400 text-xs font-normal">/ {questionCount}</span>
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Session time</span>
           </div>
 
-          <div className="bg-slate-50 p-3 rounded border border-slate-200 text-center">
-            <span className="text-[11px] text-slate-400 block font-medium">Average Speed</span>
-            <div className="text-xl sm:text-2xl font-bold font-mono text-slate-900 mt-0.5">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+            <span className="text-xs text-slate-400 block font-medium">Incorrect</span>
+            <div className="text-2xl sm:text-3xl font-bold font-mono text-rose-500 mt-1">
+              {incorrectCount}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+            <span className="text-xs text-slate-400 block font-medium">Avg Speed</span>
+            <div className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 mt-1">
               {formatSeconds(averageTimeMs)}
             </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Per question</span>
+            <span className="text-[10px] text-slate-400 block">per question</span>
           </div>
         </div>
       </div>
 
-      {/* Detailed Question Review Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            Question-by-Question Review ({questions.length})
-          </h2>
-          <span className="text-[11px] text-slate-400 font-mono">Response Logs</span>
-        </div>
+      {/* 2. Question Review Section */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide px-1">
+          Question Review ({questions.length})
+        </h2>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
-                <th className="py-2.5 px-3 text-center w-12">#</th>
-                <th className="py-2.5 px-3">Question</th>
-                <th className="py-2.5 px-3">Your Answer</th>
-                <th className="py-2.5 px-3">Correct Answer</th>
-                <th className="py-2.5 px-3 text-center">Result</th>
-                <th className="py-2.5 px-3 text-right">Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-mono">
-              {questions.map((q, idx) => {
-                const isCorrect = Boolean(q.is_correct ?? q.isCorrect);
-                const qNum = q.question_number || idx + 1;
-                const timeMs = q.time_taken_ms || 0;
-                const userAnswer = q.user_answer;
-                const correctAnswer = q.correct_answer;
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden divide-y divide-slate-100">
+          {questions.map((q, idx) => {
+            const isCorrect = Boolean(q.is_correct ?? q.isCorrect);
+            const qNum = q.question_number || idx + 1;
+            const timeMs = q.time_taken_ms || 0;
+            const userAnswer = q.user_answer;
+            const correctAnswer = q.correct_answer;
 
-                return (
-                  <tr
-                    key={q.id || idx}
-                    className={`hover:bg-slate-50/70 transition-colors ${
-                      !isCorrect ? 'bg-rose-50/40' : ''
+            return (
+              <div
+                key={q.id || idx}
+                className={`p-4 flex items-center justify-between transition-colors ${
+                  !isCorrect ? 'bg-rose-50/30' : 'hover:bg-slate-50/60'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      isCorrect
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
                     }`}
                   >
-                    <td className="py-2.5 px-3 text-center text-slate-400 text-[11px]">
-                      {qNum}
-                    </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    {isCorrect ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-slate-400 mr-2 font-mono">#{qNum}</span>
+                    <span className="font-mono font-bold text-slate-900 text-base">
                       {q.question}
-                    </td>
-                    <td className="py-2.5 px-3">
-                      {userAnswer !== null && userAnswer !== undefined ? (
-                        <span
-                          className={
-                            isCorrect
-                              ? 'text-emerald-700 font-bold'
-                              : 'text-rose-600 font-bold line-through'
-                          }
-                        >
-                          {userAnswer}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 italic">Skipped</span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 font-bold text-slate-800">
-                      {correctAnswer}
-                    </td>
-                    <td className="py-2.5 px-3 text-center">
-                      {isCorrect ? (
-                        <span className="inline-flex items-center text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded text-[10px] font-medium">
-                          <CheckCircle className="w-3 h-3 mr-1 text-emerald-600" />
-                          Correct
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded text-[10px] font-medium">
-                          <XCircle className="w-3 h-3 mr-1 text-rose-600" />
-                          Incorrect
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-slate-500 text-[11px]">
-                      {formatSeconds(timeMs)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-6 text-right">
+                  <div className="font-mono text-sm">
+                    {userAnswer !== null && userAnswer !== undefined ? (
+                      <span
+                        className={
+                          isCorrect
+                            ? 'text-emerald-600 font-bold'
+                            : 'text-rose-500 font-bold line-through mr-2'
+                        }
+                      >
+                        {userAnswer}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic mr-2">Skipped</span>
+                    )}
+
+                    {!isCorrect && (
+                      <span className="text-slate-900 font-bold">
+                        {correctAnswer}
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                    {formatSeconds(timeMs)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

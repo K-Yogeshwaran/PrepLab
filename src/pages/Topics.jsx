@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Calculator, ArrowRight, RefreshCw, CheckCircle2, Play } from 'lucide-react';
+import { ArrowRight, Play, RefreshCw, Zap } from 'lucide-react';
 import { getTopics, seedDefaultTopic } from '../services/topicsService';
 import { getDashboardStats } from '../services/statsService';
-import { getTopicGenerator } from '../generators';
 import { formatAccuracy, formatSeconds } from '../utils/formatters';
-import EmptyState from '../components/EmptyState';
 import Alert from '../components/Alert';
 
 export default function Topics() {
@@ -30,7 +28,6 @@ export default function Topics() {
         setTopics(topicsRes.data || []);
       }
 
-      // Map topic performance stats if available
       if (statsRes?.topicPerformance) {
         const map = {};
         statsRes.topicPerformance.forEach((p) => {
@@ -39,7 +36,7 @@ export default function Topics() {
         setTopicStats(map);
       }
     } catch (e) {
-      setError(e.message || 'Unexpected error loading curriculum');
+      setError(e.message || 'Unexpected error loading topics');
     } finally {
       setLoading(false);
     }
@@ -62,71 +59,66 @@ export default function Topics() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 max-w-3xl mx-auto">
       {/* Page Header */}
-      <div className="border-b border-slate-200 pb-5">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-          <span>Curriculum Catalog</span>
-          <span>&middot;</span>
-          <span>Syllabus Modules</span>
-        </div>
+      <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-          Study Modules
+          Topics
         </h1>
-        <p className="text-sm text-slate-600 mt-1 max-w-2xl">
-          Core quantitative aptitude modules. Master fundamentals through timed drills before advancing to complex multi-step topics.
+        <p className="text-sm text-slate-500 mt-1">
+          Select a topic to start practicing.
         </p>
       </div>
 
       {error && (
-        <Alert variant="warning" title="Database Notice">
-          {error}. Please verify your database connection.
+        <Alert variant="warning" title="Notice">
+          {error}
         </Alert>
       )}
 
       {/* Loading State */}
       {loading && (
         <div className="py-16 flex flex-col items-center justify-center space-y-3">
-          <RefreshCw className="w-6 h-6 text-brand-600 animate-spin" />
-          <p className="text-xs font-medium text-slate-500">Loading curriculum modules...</p>
+          <RefreshCw className="w-5 h-5 text-brand-600 animate-spin" />
+          <p className="text-xs text-slate-400">Loading topics...</p>
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty State / Seed */}
       {!loading && topics.length === 0 && (
-        <EmptyState
-          icon={BookOpen}
-          title="No topics found in Supabase"
-          description="The topics table in your database is empty. Click below to initialize Fast Addition & Subtraction or run schema.sql in your Supabase SQL editor."
-          actionText={seeding ? 'Initializing...' : 'Seed Fast Addition & Subtraction'}
-          onAction={handleSeedTopic}
-        />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-4">
+          <p className="text-sm text-slate-600">No active topics found.</p>
+          <button
+            onClick={handleSeedTopic}
+            disabled={seeding}
+            className="px-4 py-2 bg-brand-600 text-white rounded-xl text-xs font-semibold hover:bg-brand-700 transition-colors"
+          >
+            {seeding ? 'Initializing...' : 'Initialize Fast Addition & Subtraction'}
+          </button>
+        </div>
       )}
 
-      {/* Active Modules List */}
+      {/* Topic Cards */}
       {!loading && topics.length > 0 && (
-        <div className="space-y-4">
-          {topics.map((topic, index) => {
-            const generator = getTopicGenerator(topic.id) || getTopicGenerator(topic.name);
-            const perf = topicStats[topic.id] || topicStats[String(topic.id)] || topicStats['fast-addition-subtraction'] || topicStats['1'];
+        <div className="space-y-3">
+          {topics.map((topic) => {
+            const perf =
+              topicStats[topic.id] ||
+              topicStats[String(topic.id)] ||
+              topicStats['fast-addition-subtraction'] ||
+              topicStats['1'];
             const hasPracticeHistory = Boolean(perf && perf.testsCount > 0);
 
             return (
               <div
                 key={topic.id}
-                className="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6"
+                className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-300 transition-colors"
               >
-                <div className="space-y-3 flex-1">
+                <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                      Module {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <span className="text-xs font-semibold text-brand-700">
+                    <span className="w-2 h-2 rounded-full bg-brand-600" />
+                    <span className="text-xs font-semibold text-brand-600">
                       {topic.category || 'Quantitative Aptitude'}
-                    </span>
-                    <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
-                      <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" />
-                      Active
                     </span>
                   </div>
 
@@ -134,48 +126,32 @@ export default function Topics() {
                     <h2 className="text-lg font-bold text-slate-900">
                       {topic.name}
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                      {generator?.description ||
-                        'Master rapid mental calculation and near-base adjustments to maximize score speed in aptitude exams.'}
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                      Master rapid calculation speed and zero-error arithmetic.
                     </p>
                   </div>
 
-                  {/* Real Historical Performance or "Not practiced yet" */}
-                  <div className="pt-2 flex flex-wrap items-center gap-4 text-xs">
-                    {hasPracticeHistory ? (
-                      <div className="flex items-center space-x-4 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded">
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Drills Done:</span>
-                          <span className="font-mono font-bold text-slate-800">{perf.testsCount}</span>
-                        </div>
-                        <div className="border-l border-slate-200 pl-3">
-                          <span className="text-slate-400 block text-[10px]">Avg Accuracy:</span>
-                          <span className="font-mono font-bold text-brand-700">{formatAccuracy(perf.accuracy)}</span>
-                        </div>
-                        <div className="border-l border-slate-200 pl-3">
-                          <span className="text-slate-400 block text-[10px]">Avg Speed:</span>
-                          <span className="font-mono font-bold text-slate-800">{formatSeconds(perf.avgTimeMs)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-slate-400 text-xs italic bg-slate-50 border border-slate-100 px-2.5 py-1 rounded">
-                        Not practiced yet
+                  {/* Real Stats if completed */}
+                  {hasPracticeHistory && (
+                    <div className="flex items-center space-x-4 text-xs font-mono text-slate-500 pt-1">
+                      <span>{perf.testsCount} {perf.testsCount === 1 ? 'drill' : 'drills'}</span>
+                      <span>&middot;</span>
+                      <span className="font-semibold text-emerald-600">
+                        {formatAccuracy(perf.accuracy)} accuracy
                       </span>
-                    )}
-                  </div>
+                      <span>&middot;</span>
+                      <span>{formatSeconds(perf.avgTimeMs)} / q</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Direct Action */}
-                <div className="flex-shrink-0 self-start md:self-center">
-                  <Link
-                    to={`/practice?topic=${encodeURIComponent(topic.id)}`}
-                    className="inline-flex items-center px-4 py-2.5 rounded-md bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-brand-700 transition-colors shadow-xs"
-                  >
-                    <Play className="w-3.5 h-3.5 mr-2 fill-white" />
-                    Configure Drill
-                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                  </Link>
-                </div>
+                <Link
+                  to={`/practice?topic=${encodeURIComponent(topic.id)}`}
+                  className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-brand-600 transition-colors shadow-xs self-start sm:self-auto"
+                >
+                  <span>Practice</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Link>
               </div>
             );
           })}

@@ -24,8 +24,8 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="relative bg-white rounded-lg max-w-md w-full p-6 shadow-lg border border-slate-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="relative bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200/80">
         <button
           onClick={onCancel}
           className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors p-1"
@@ -36,7 +36,7 @@ export default function ConfirmModal({
 
         <div className="flex items-start space-x-3.5 mb-4">
           <div
-            className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${
+            className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
               variant === 'danger' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
             }`}
           >
@@ -52,17 +52,17 @@ export default function ConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+            className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
           >
             {cancelText}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-3.5 py-1.5 text-xs font-semibold text-white rounded transition-colors cursor-pointer ${
+            className={`px-4 py-2 text-xs font-semibold text-white rounded-xl transition-colors cursor-pointer ${
               variant === 'danger'
                 ? 'bg-rose-600 hover:bg-rose-700'
-                : 'bg-slate-900 hover:bg-slate-800'
+                : 'bg-brand-600 hover:bg-brand-700'
             }`}
           >
             {confirmText}

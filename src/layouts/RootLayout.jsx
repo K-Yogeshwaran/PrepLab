@@ -7,7 +7,7 @@ import Footer from '../components/Footer';
 
 export default function RootLayout() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row antialiased">
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 flex flex-col lg:flex-row antialiased selection:bg-brand-100 selection:text-brand-900">
       {/* 1. Desktop Sidebar (>= 1024px) */}
       <div className="hidden lg:block lg:flex-shrink-0">
         <Sidebar />
@@ -19,7 +19,7 @@ export default function RootLayout() {
         <TopNav />
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-20 md:pb-8">
+        <main className="flex-1 w-full max-w-[1450px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 pb-20 md:pb-8">
           <Outlet />
         </main>
 

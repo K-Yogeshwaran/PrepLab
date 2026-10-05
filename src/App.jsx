@@ -17,6 +17,7 @@ export default function App() {
         <Route path="practice" element={<Practice />} />
         <Route path="results/:id" element={<Results />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="progress" element={<Dashboard />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
