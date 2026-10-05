@@ -13,6 +13,7 @@ export async function getDashboardStats() {
       totalTests: 0,
       totalQuestions: 0,
       totalCorrect: 0,
+      totalIncorrect: 0,
       overallAccuracy: 0,
       averageTimePerQuestionMs: 0,
       bestAccuracy: 0,
@@ -21,7 +22,6 @@ export async function getDashboardStats() {
       charts: {
         accuracyTrend: [],
         timeTrend: [],
-        cumulativeQuestionsTrend: [],
       },
     };
   }
@@ -35,7 +35,7 @@ export async function getDashboardStats() {
         *,
         topics:topic_id (id, name, category)
       `)
-      .order('created_at', { ascending: true }); // Ascending for chronological trends
+      .order('created_at', { ascending: true }); // Chronological order for accurate time-series
 
     if (error) {
       console.error('Supabase query error in dashboard:', error.message);
@@ -45,6 +45,7 @@ export async function getDashboardStats() {
         totalTests: 0,
         totalQuestions: 0,
         totalCorrect: 0,
+        totalIncorrect: 0,
         overallAccuracy: 0,
         averageTimePerQuestionMs: 0,
         bestAccuracy: 0,
@@ -53,7 +54,6 @@ export async function getDashboardStats() {
         charts: {
           accuracyTrend: [],
           timeTrend: [],
-          cumulativeQuestionsTrend: [],
         },
       };
     }
@@ -69,6 +69,7 @@ export async function getDashboardStats() {
       totalTests: 0,
       totalQuestions: 0,
       totalCorrect: 0,
+      totalIncorrect: 0,
       overallAccuracy: 0,
       averageTimePerQuestionMs: 0,
       bestAccuracy: 0,
@@ -77,7 +78,6 @@ export async function getDashboardStats() {
       charts: {
         accuracyTrend: [],
         timeTrend: [],
-        cumulativeQuestionsTrend: [],
       },
     };
   }
@@ -90,6 +90,7 @@ export async function getDashboardStats() {
       totalTests: 0,
       totalQuestions: 0,
       totalCorrect: 0,
+      totalIncorrect: 0,
       overallAccuracy: 0,
       averageTimePerQuestionMs: 0,
       bestAccuracy: 0,
@@ -98,7 +99,6 @@ export async function getDashboardStats() {
       charts: {
         accuracyTrend: [],
         timeTrend: [],
-        cumulativeQuestionsTrend: [],
       },
     };
   }
@@ -112,8 +112,6 @@ export async function getDashboardStats() {
 
   const accuracyTrend = [];
   const timeTrend = [];
-  const cumulativeQuestionsTrend = [];
-  let cumulativeQuestions = 0;
 
   const topicMap = {};
 
@@ -122,42 +120,41 @@ export async function getDashboardStats() {
     const cCount = parseInt(test.correct_count, 10) || 0;
     const accuracy = parseFloat(test.accuracy) || 0;
     const timeMs = parseInt(test.total_time_ms, 10) || 0;
-    const avgTimeMs = parseInt(test.average_time_ms, 10) || 0;
+    const avgTimeMs = parseInt(test.average_time_ms, 10) || (qCount > 0 ? timeMs / qCount : 0);
 
     totalQuestions += qCount;
     totalCorrect += cCount;
     totalTimeMs += timeMs;
-    cumulativeQuestions += qCount;
 
     if (accuracy > bestAccuracy) {
       bestAccuracy = accuracy;
     }
 
-    const testLabel = `Test #${index + 1}`;
+    const testLabel = `Drill #${index + 1}`;
     const dateLabel = formatShortDate(test.created_at);
 
+    // Chart 1 data point: Accuracy Trend
     accuracyTrend.push({
       testNumber: index + 1,
       label: testLabel,
       date: dateLabel,
       accuracy: Math.round(accuracy * 10) / 10,
+      correctCount: cCount,
+      questionCount: qCount,
+      rawCreatedAt: test.created_at,
     });
 
+    // Chart 2 data point: Average Speed Trend (seconds per question)
     timeTrend.push({
       testNumber: index + 1,
       label: testLabel,
       date: dateLabel,
       avgTimeSeconds: Math.round((avgTimeMs / 1000) * 10) / 10,
+      totalDurationMs: timeMs,
+      rawCreatedAt: test.created_at,
     });
 
-    cumulativeQuestionsTrend.push({
-      testNumber: index + 1,
-      label: testLabel,
-      date: dateLabel,
-      questions: cumulativeQuestions,
-    });
-
-    // Topic grouping
+    // Topic grouping for Chart 3
     const topicId = String(test.topic_id || 'unknown');
     const topicName =
       test.topics?.name ||
@@ -169,6 +166,7 @@ export async function getDashboardStats() {
       topicMap[topicId] = {
         id: topicId,
         name: topicName,
+        category: test.topics?.category || 'Speed Math',
         testsCount: 0,
         questionsCount: 0,
         correctCount: 0,
@@ -182,20 +180,29 @@ export async function getDashboardStats() {
     topicMap[topicId].totalTimeMs += timeMs;
   });
 
+  const totalIncorrect = Math.max(0, totalQuestions - totalCorrect);
+
+  // Mathematically accurate overall accuracy: SUM(correct) / SUM(total) * 100
   const overallAccuracy =
     totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 1000) / 10 : 0;
 
+  // Mathematically accurate average speed: SUM(total_time_ms) / SUM(questions)
   const averageTimePerQuestionMs =
     totalQuestions > 0 ? Math.round(totalTimeMs / totalQuestions) : 0;
 
   const topicPerformance = Object.values(topicMap).map((t) => ({
     ...t,
+    incorrectCount: Math.max(0, t.questionsCount - t.correctCount),
     accuracy:
       t.questionsCount > 0 ? Math.round((t.correctCount / t.questionsCount) * 1000) / 10 : 0,
     avgTimeMs: t.questionsCount > 0 ? Math.round(t.totalTimeMs / t.questionsCount) : 0,
+    avgTimeSeconds:
+      t.questionsCount > 0
+        ? Math.round((t.totalTimeMs / t.questionsCount / 1000) * 10) / 10
+        : 0,
   }));
 
-  // Recent tests (chronologically descending)
+  // Recent tests (chronologically descending for latest attempts table)
   const recentTests = [...tests].reverse().slice(0, 10);
 
   return {
@@ -204,6 +211,7 @@ export async function getDashboardStats() {
     totalTests,
     totalQuestions,
     totalCorrect,
+    totalIncorrect,
     overallAccuracy,
     averageTimePerQuestionMs,
     bestAccuracy,
@@ -212,7 +220,6 @@ export async function getDashboardStats() {
     charts: {
       accuracyTrend,
       timeTrend,
-      cumulativeQuestionsTrend,
     },
   };
 }
