@@ -188,12 +188,27 @@ export default function Results() {
                     {isCorrect ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
                   </div>
 
-                  <div>
-                    <span className="text-xs text-slate-400 mr-2 font-mono">#{qNum}</span>
-                    <span className="font-mono font-bold text-slate-900 text-base">
-                      {q.question}
-                    </span>
-                  </div>
+                    <div>
+                      <span className="text-xs text-slate-400 mr-2 font-mono">#{qNum}</span>
+                      <span className="font-mono font-bold text-slate-900 text-base mr-2">
+                        {q.question}
+                      </span>
+                      {q.operation && (
+                        <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {q.operation === 'multiplication'
+                            ? 'Multiplication'
+                            : q.operation === 'square'
+                            ? 'Square'
+                            : q.operation === 'cube'
+                            ? 'Cube'
+                            : q.operation === 'square_root'
+                            ? 'Square Root'
+                            : q.operation === 'cube_root'
+                            ? 'Cube Root'
+                            : q.operation}
+                        </span>
+                      )}
+                    </div>
                 </div>
 
                 <div className="flex items-center space-x-6 text-right">

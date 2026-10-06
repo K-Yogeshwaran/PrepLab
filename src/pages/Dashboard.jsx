@@ -383,7 +383,13 @@ export default function Dashboard() {
                   {formatDateTime(t.created_at)}
                 </div>
                 <div className="text-sm font-bold text-slate-900">
-                  Fast Addition & Subtraction
+                  {t.topics?.name ||
+                    (String(t.topic_id) === '3' ||
+                    String(t.topic_id) === '2' ||
+                    String(t.topic_id).includes('table') ||
+                    String(t.topic_id) === 'tables-squares-cubes'
+                      ? 'Tables, Squares & Cubes'
+                      : 'Fast Addition & Subtraction')}
                 </div>
               </div>
 

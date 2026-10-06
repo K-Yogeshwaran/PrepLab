@@ -26,13 +26,22 @@ export async function getTopics() {
       };
     }
 
-    // If topics table is currently empty, attempt to seed default row
-    if (!data || data.length === 0) {
-      const seeded = await seedDefaultTopic();
-      if (seeded) {
-        return { data: [seeded], error: null };
-      }
-      return { data: [], error: null };
+    // Ensure all default topics are seeded if missing
+    const defaultNames = ['Fast Addition & Subtraction', 'Tables, Squares & Cubes'];
+    const existingNames = new Set((data || []).map((t) => t.name));
+    const isMissingTopics = defaultNames.some((n) => !existingNames.has(n));
+
+    if (isMissingTopics) {
+      await seedDefaultTopic();
+      const { data: refreshedData } = await supabase
+        .from('topics')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      return {
+        data: refreshedData || data || [],
+        error: null,
+      };
     }
 
     return {
@@ -76,47 +85,53 @@ export async function getTopicById(id) {
 }
 
 /**
- * Seeds the initial Fast Addition & Subtraction topic into Supabase
- * Adaptive to either BIGINT identity or TEXT id column.
+ * Seeds default topics (Fast Addition & Subtraction, Tables, Squares & Cubes) into Supabase
  */
 export async function seedDefaultTopic() {
   if (!isSupabaseConfigured() || !supabase) return null;
 
+  const defaultTopics = [
+    {
+      name: 'Fast Addition & Subtraction',
+      category: 'Speed Math',
+    },
+    {
+      name: 'Tables, Squares & Cubes',
+      category: 'Speed Math',
+    },
+  ];
+
   try {
-    // Attempt 1: Insert without ID (PostgreSQL generates identity)
+    // Check existing topics first
+    const { data: existing } = await supabase.from('topics').select('name');
+    const existingNames = new Set((existing || []).map((t) => t.name));
+
+    const toInsert = defaultTopics.filter((t) => !existingNames.has(t.name));
+    if (toInsert.length === 0) return true;
+
+    // Insert missing topics without ID (let database generate identity or text)
     const { data, error } = await supabase
       .from('topics')
-      .insert([
-        {
-          name: 'Fast Addition & Subtraction',
-          category: 'Speed Math',
-        },
-      ])
-      .select()
-      .maybeSingle();
+      .insert(toInsert)
+      .select();
 
     if (!error && data) {
       return data;
     }
 
-    // Attempt 2: If table requires explicit text id
-    const { data: textData, error: textErr } = await supabase
+    // Fallback: If text id is required
+    const textInsert = toInsert.map((t) => ({
+      id: t.name === 'Tables, Squares & Cubes' ? 'tables-squares-cubes' : 'fast-addition-subtraction',
+      name: t.name,
+      category: t.category,
+    }));
+
+    const { data: textData } = await supabase
       .from('topics')
-      .insert([
-        {
-          id: 'fast-addition-subtraction',
-          name: 'Fast Addition & Subtraction',
-          category: 'Speed Math',
-        },
-      ])
-      .select()
-      .maybeSingle();
+      .insert(textInsert)
+      .select();
 
-    if (!textErr && textData) {
-      return textData;
-    }
-
-    return null;
+    return textData || null;
   } catch (err) {
     console.warn('Seed exception:', err);
     return null;

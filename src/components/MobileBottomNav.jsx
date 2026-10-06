@@ -1,18 +1,19 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, BookOpen, TrendingUp, Zap } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, Zap, Book } from 'lucide-react';
 
 export default function MobileBottomNav() {
   const navItems = [
     { to: '/', label: 'Home', icon: Home, end: true },
     { to: '/practice', label: 'Practice', icon: Zap },
+    { to: '/learn', label: 'Learn', icon: Book },
     { to: '/topics', label: 'Topics', icon: BookOpen },
     { to: '/progress', label: 'Progress', icon: TrendingUp },
   ];
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 safe-area-inset-bottom">
-      <div className="grid grid-cols-4 h-14">
+      <div className="grid grid-cols-5 h-14">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (

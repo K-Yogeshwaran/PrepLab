@@ -96,43 +96,62 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 2. Today's Focus / Available Topic Card */}
+          {/* 2. Today's Focus / Available Topic Cards */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Zap className="w-4 h-4 text-brand-600" />
                 <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Today's Focus
+                  Practice Modules
                 </h2>
               </div>
               <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
-                Active Module
+                Active
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold text-slate-900">
-                  Fast Addition & Subtraction
-                </h3>
-                {hasHistory ? (
-                  <p className="text-xs sm:text-sm font-mono text-slate-500">
-                    Recent performance: <span className="font-bold text-emerald-600">{formatAccuracy(stats.overallAccuracy)} accuracy</span> &middot; <span className="font-bold text-slate-800">{formatSeconds(stats.averageTimePerQuestionMs)} / q</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              {/* Module 01 */}
+              <div className="bg-slate-50/70 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase text-brand-600 tracking-wider block">Module 01</span>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Fast Addition & Subtraction
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Speed math techniques, near-base adjustments, and rapid arithmetic.
                   </p>
-                ) : (
-                  <p className="text-xs sm:text-sm text-slate-500">
-                    Build split-second calculation reflexes and zero-error accuracy.
-                  </p>
-                )}
+                </div>
+
+                <Link
+                  to="/practice?topic=fast-addition-subtraction"
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-brand-600 transition-colors shadow-xs self-start"
+                >
+                  <span>Practice Module</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Link>
               </div>
 
-              <Link
-                to="/practice?topic=fast-addition-subtraction"
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-semibold hover:bg-brand-600 transition-colors shadow-xs self-start sm:self-auto flex-shrink-0"
-              >
-                <span>Practice</span>
-                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-              </Link>
+              {/* Module 02 */}
+              <div className="bg-slate-50/70 border border-slate-200/60 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase text-brand-600 tracking-wider block">Module 02</span>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Tables, Squares & Cubes
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Tables 1-20 (memorization & speed), squares 1-50, cubes 1-25 & roots.
+                  </p>
+                </div>
+
+                <Link
+                  to="/practice?topic=tables-squares-cubes"
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-brand-600 text-white text-xs font-semibold hover:bg-brand-700 transition-colors shadow-xs self-start"
+                >
+                  <span>Practice Module</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -188,7 +207,12 @@ export default function Home() {
                         {formatDateTime(t.created_at)}
                       </div>
                       <div className="text-sm font-bold text-slate-900">
-                        Fast Addition & Subtraction
+                        {t.topics?.name ||
+                          (String(t.topic_id) === '2' ||
+                          String(t.topic_id).includes('table') ||
+                          String(t.topic_id) === 'tables-squares-cubes'
+                            ? 'Tables, Squares & Cubes'
+                            : 'Fast Addition & Subtraction')}
                       </div>
                     </div>
 

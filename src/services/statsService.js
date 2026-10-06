@@ -178,7 +178,9 @@ export async function getDashboardStats() {
     const topicId = String(test.topic_id || 'unknown');
     const topicName =
       test.topics?.name ||
-      (topicId === '1' || topicId === 'fast-addition-subtraction'
+      (topicId === '3' || topicId === '2' || topicId === 'tables-squares-cubes'
+        ? 'Tables, Squares & Cubes'
+        : topicId === '1' || topicId === 'fast-addition-subtraction'
         ? 'Fast Addition & Subtraction'
         : `Topic #${topicId}`);
 

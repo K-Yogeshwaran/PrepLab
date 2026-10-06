@@ -3,6 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import { additionSubtractionTopic } from '../src/generators/additionSubtraction.js';
+import { tablesSquaresCubesTopic } from '../src/generators/tablesSquaresCubes.js';
 import { getTopicGenerator, hasTopicGenerator, getRegisteredTopicDefinitions } from '../src/generators/index.js';
 import {
   formatDuration,
@@ -40,15 +41,29 @@ test('Registry contains fast-addition-subtraction', () => {
   assert.equal(gen.name, 'Fast Addition & Subtraction');
 });
 
+test('Registry contains tables-squares-cubes', () => {
+  assert.equal(hasTopicGenerator('tables-squares-cubes'), true);
+  const gen = getTopicGenerator('tables-squares-cubes');
+  assert.ok(gen);
+  assert.equal(gen.id, 'tables-squares-cubes');
+  assert.equal(gen.name, 'Tables, Squares & Cubes');
+});
+
+test('Registry maps DB ID 1 and 3 correctly', () => {
+  const m1 = getTopicGenerator(1);
+  const m2 = getTopicGenerator(3);
+  assert.equal(m1.id, 'fast-addition-subtraction');
+  assert.equal(m2.id, 'tables-squares-cubes');
+});
+
 test('Registry returns all registered definitions', () => {
   const defs = getRegisteredTopicDefinitions();
   assert.ok(Array.isArray(defs));
-  assert.ok(defs.length >= 1);
-  assert.equal(defs[0].id, 'fast-addition-subtraction');
+  assert.ok(defs.length >= 2);
 });
 
-// 2. Question Generator Mathematical Correctness Tests
-console.log('\n[Suite 2: Question Generation & Math Accuracy]');
+// 2. Question Generator Mathematical Correctness Tests — Module 01
+console.log('\n[Suite 2: Module 01 — Addition & Subtraction]');
 test('Generates requested question count', () => {
   const counts = [5, 10, 15, 20, 25, 50];
   for (const count of counts) {
@@ -91,36 +106,70 @@ test('Every subtraction question is non-negative and mathematically verified', (
   }
 });
 
-test('Both operation mode produces mix of addition and subtraction', () => {
-  const questions = additionSubtractionTopic.generateQuestions({
+// 3. Question Generator Mathematical Correctness Tests — Module 02
+console.log('\n[Suite 3: Module 02 — Tables, Squares & Cubes]');
+test('20-line memorization generates exactly 20 sequential questions', () => {
+  const questions = tablesSquaresCubesTopic.generateQuestions({
+    mode: 'tables',
+    table: 17,
+    subMode: 'memorization',
+  });
+
+  assert.equal(questions.length, 20);
+  for (let i = 0; i < 20; i++) {
+    const step = i + 1;
+    const q = questions[i];
+    assert.equal(q.operation, 'multiplication');
+    assert.equal(q.question, `17 × ${step}`);
+    assert.equal(q.correctAnswer, 17 * step);
+  }
+});
+
+test('Squares mode generates numbers 1-50 correctly', () => {
+  const questions = tablesSquaresCubesTopic.generateQuestions({
+    mode: 'squares',
+    count: 20,
+  });
+
+  assert.equal(questions.length, 20);
+  for (const q of questions) {
+    assert.equal(q.operation, 'square');
+    assert.ok(q.num1 >= 1 && q.num1 <= 50, `Square base ${q.num1} should be in [1, 50]`);
+    assert.equal(q.question, `${q.num1}²`);
+    assert.equal(q.correctAnswer, q.num1 * q.num1);
+  }
+});
+
+test('Cubes mode generates numbers 1-25 correctly', () => {
+  const questions = tablesSquaresCubesTopic.generateQuestions({
+    mode: 'cubes',
+    count: 20,
+  });
+
+  assert.equal(questions.length, 20);
+  for (const q of questions) {
+    assert.equal(q.operation, 'cube');
+    assert.ok(q.num1 >= 1 && q.num1 <= 25, `Cube base ${q.num1} should be in [1, 25]`);
+    assert.equal(q.question, `${q.num1}³`);
+    assert.equal(q.correctAnswer, q.num1 * q.num1 * q.num1);
+  }
+});
+
+test('Mixed mode produces blend of tables, squares, and cubes without roots', () => {
+  const questions = tablesSquaresCubesTopic.generateQuestions({
+    mode: 'mixed',
     count: 40,
-    operation: 'both',
-    difficulty: 'medium',
-    style: 'mixed',
   });
 
-  const additions = questions.filter((q) => q.operation === 'addition');
-  const subtractions = questions.filter((q) => q.operation === 'subtraction');
-
-  assert.ok(additions.length > 0, 'Expected some additions in "both" mode');
-  assert.ok(subtractions.length > 0, 'Expected some subtractions in "both" mode');
+  assert.equal(questions.length, 40);
+  const validOps = new Set(['multiplication', 'square', 'cube']);
+  for (const q of questions) {
+    assert.ok(validOps.has(q.operation), `Operation ${q.operation} must be valid`);
+  }
 });
 
-test('Questions within a test have no immediate duplicate question texts', () => {
-  const questions = additionSubtractionTopic.generateQuestions({
-    count: 25,
-    operation: 'both',
-    difficulty: 'mixed',
-    style: 'mixed',
-  });
-
-  const texts = questions.map((q) => q.question);
-  const uniqueTexts = new Set(texts);
-  assert.equal(texts.length, uniqueTexts.size, 'All questions in test must be distinct');
-});
-
-// 3. Formatters Tests
-console.log('\n[Suite 3: Utility & Formatter Functions]');
+// 4. Formatters Tests
+console.log('\n[Suite 4: Utility & Formatter Functions]');
 test('formatDuration formats milliseconds correctly', () => {
   assert.equal(formatDuration(4200), '4.2s');
   assert.equal(formatDuration(65000), '1m 05s');

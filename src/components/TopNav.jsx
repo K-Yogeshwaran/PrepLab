@@ -1,12 +1,13 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Home, BookOpen, TrendingUp, Zap, Play } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, Zap, Play, Book } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 
 export default function TopNav() {
   const navItems = [
     { to: '/', label: 'Home', icon: Home, end: true },
     { to: '/practice', label: 'Practice', icon: Zap },
+    { to: '/learn', label: 'Learn', icon: Book },
     { to: '/topics', label: 'Topics', icon: BookOpen },
     { to: '/progress', label: 'Progress', icon: TrendingUp },
   ];

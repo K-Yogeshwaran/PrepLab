@@ -6,6 +6,7 @@ import {
   BookOpen,
   TrendingUp,
   Zap,
+  Book,
 } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 
@@ -13,6 +14,7 @@ export default function Sidebar() {
   const navItems = [
     { to: '/', label: 'Home', icon: Home, end: true },
     { to: '/practice', label: 'Practice', icon: Zap },
+    { to: '/learn', label: 'Learn', icon: Book },
     { to: '/topics', label: 'Topics', icon: BookOpen },
     { to: '/progress', label: 'Progress', icon: TrendingUp },
   ];

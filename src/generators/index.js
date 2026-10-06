@@ -1,17 +1,16 @@
 import additionSubtractionTopic from './additionSubtraction.js';
+import tablesSquaresCubesTopic from './tablesSquaresCubes.js';
 
 /**
  * Registry of all available topic question generators.
- * To add a new topic in the future:
- * 1. Create a new generator module in `src/generators/<topicName>.js`.
- * 2. Register it in this dictionary by its unique topic ID (matching the topics table).
  */
 const generatorRegistry = {
   [additionSubtractionTopic.id]: additionSubtractionTopic,
+  [tablesSquaresCubesTopic.id]: tablesSquaresCubesTopic,
 };
 
 /**
- * Retrieve a topic generator by topic ID, numeric ID, or topic name.
+ * Retrieve a topic generator by topic ID (e.g. 1 or 3), slug, or name.
  */
 export function getTopicGenerator(identifier) {
   if (identifier == null) return null;
@@ -23,17 +22,33 @@ export function getTopicGenerator(identifier) {
     return generatorRegistry[key];
   }
 
-  // 2. Lookup by id or name across registered topics
+  // 2. ID / Slug / Keyword matching
+  if (
+    key.includes('table') ||
+    key.includes('square') ||
+    key.includes('cube') ||
+    key === '3' ||
+    key === '2'
+  ) {
+    return tablesSquaresCubesTopic;
+  }
+
+  if (
+    key.includes('addition') ||
+    key.includes('subtraction') ||
+    key === '1'
+  ) {
+    return additionSubtractionTopic;
+  }
+
   const all = Object.values(generatorRegistry);
   const found = all.find(
     (t) =>
       String(t.id).toLowerCase() === key ||
-      String(t.name).toLowerCase() === key ||
-      key.includes('addition') ||
-      key === '1'
+      String(t.name).toLowerCase() === key
   );
 
-  return found || null;
+  return found || additionSubtractionTopic;
 }
 
 /**

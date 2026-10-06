@@ -31,13 +31,33 @@ export async function saveTestAttempt({
     // Resolve topic_id to match database type if topics table uses numeric IDs
     let resolvedTopicId = topicId;
     if (typeof topicId === 'string' && isNaN(Number(topicId))) {
-      const { data: topicsList } = await supabase
+      const { data: idMatch } = await supabase
         .from('topics')
-        .select('id, name')
-        .limit(1);
+        .select('id')
+        .eq('id', topicId)
+        .maybeSingle();
 
-      if (topicsList && topicsList.length > 0) {
-        resolvedTopicId = topicsList[0].id;
+      if (idMatch?.id) {
+        resolvedTopicId = idMatch.id;
+      } else {
+        const isModule2 =
+          topicId.includes('table') ||
+          topicId.includes('square') ||
+          topicId.includes('cube') ||
+          topicId === '2';
+        const targetName = isModule2
+          ? 'Tables, Squares & Cubes'
+          : 'Fast Addition & Subtraction';
+
+        const { data: nameMatch } = await supabase
+          .from('topics')
+          .select('id')
+          .ilike('name', `%${targetName.split(' ')[0]}%`)
+          .maybeSingle();
+
+        if (nameMatch?.id) {
+          resolvedTopicId = nameMatch.id;
+        }
       }
     }
 

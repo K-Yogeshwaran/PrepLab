@@ -105,9 +105,14 @@ export default function Topics() {
             const perf =
               topicStats[topic.id] ||
               topicStats[String(topic.id)] ||
-              topicStats['fast-addition-subtraction'] ||
-              topicStats['1'];
+              topicStats[topic.name];
             const hasPracticeHistory = Boolean(perf && perf.testsCount > 0);
+
+            const description =
+              topic.description ||
+              (topic.name === 'Tables, Squares & Cubes'
+                ? 'Master multiplication tables (1–20), squares (1–50), and cubes (1–25) through 20-line memorization and speed drills.'
+                : 'Master rapid calculation speed, near-base adjustment techniques, and zero-error arithmetic.');
 
             return (
               <div
@@ -127,7 +132,7 @@ export default function Topics() {
                       {topic.name}
                     </h2>
                     <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                      Master rapid calculation speed and zero-error arithmetic.
+                      {description}
                     </p>
                   </div>
 
