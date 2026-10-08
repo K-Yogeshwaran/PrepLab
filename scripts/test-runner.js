@@ -125,46 +125,80 @@ test('20-line memorization generates exactly 20 sequential questions', () => {
   }
 });
 
-test('Squares mode generates numbers 1-50 correctly', () => {
+test('Multi-table speed drill generates ONLY from selected tables set [12, 13, 14]', () => {
+  const selectedTables = [12, 13, 14];
   const questions = tablesSquaresCubesTopic.generateQuestions({
-    mode: 'squares',
-    count: 20,
+    mode: 'tables',
+    tables: selectedTables,
+    subMode: 'speed',
+    count: 30,
   });
 
-  assert.equal(questions.length, 20);
+  assert.equal(questions.length, 30);
+  for (const q of questions) {
+    assert.equal(q.operation, 'multiplication');
+    assert.ok(
+      selectedTables.includes(q.num1),
+      `Generated table ${q.num1} must be in selected set [12, 13, 14]`
+    );
+    assert.ok(q.num2 >= 1 && q.num2 <= 20, `Multiplier ${q.num2} must be in [1, 20]`);
+    assert.equal(q.correctAnswer, q.num1 * q.num2);
+  }
+});
+
+test('Square range restriction 1-30 generates numbers <= 30 strictly', () => {
+  const questions = tablesSquaresCubesTopic.generateQuestions({
+    mode: 'squares',
+    squareMax: 30,
+    count: 25,
+  });
+
+  assert.equal(questions.length, 25);
   for (const q of questions) {
     assert.equal(q.operation, 'square');
-    assert.ok(q.num1 >= 1 && q.num1 <= 50, `Square base ${q.num1} should be in [1, 50]`);
+    assert.ok(q.num1 >= 1 && q.num1 <= 30, `Square base ${q.num1} must be in [1, 30]`);
     assert.equal(q.question, `${q.num1}²`);
     assert.equal(q.correctAnswer, q.num1 * q.num1);
   }
 });
 
-test('Cubes mode generates numbers 1-25 correctly', () => {
+test('Cube range restriction 1-15 generates numbers <= 15 strictly', () => {
   const questions = tablesSquaresCubesTopic.generateQuestions({
     mode: 'cubes',
-    count: 20,
+    cubeMax: 15,
+    count: 25,
   });
 
-  assert.equal(questions.length, 20);
+  assert.equal(questions.length, 25);
   for (const q of questions) {
     assert.equal(q.operation, 'cube');
-    assert.ok(q.num1 >= 1 && q.num1 <= 25, `Cube base ${q.num1} should be in [1, 25]`);
+    assert.ok(q.num1 >= 1 && q.num1 <= 15, `Cube base ${q.num1} must be in [1, 15]`);
     assert.equal(q.question, `${q.num1}³`);
     assert.equal(q.correctAnswer, q.num1 * q.num1 * q.num1);
   }
 });
 
-test('Mixed mode produces blend of tables, squares, and cubes without roots', () => {
+test('Mixed mode respects configured scopes (tables=[12, 13], squareMax=30, cubeMax=15)', () => {
+  const selectedTables = [12, 13];
   const questions = tablesSquaresCubesTopic.generateQuestions({
     mode: 'mixed',
-    count: 40,
+    tables: selectedTables,
+    squareMax: 30,
+    cubeMax: 15,
+    count: 50,
   });
 
-  assert.equal(questions.length, 40);
-  const validOps = new Set(['multiplication', 'square', 'cube']);
+  assert.equal(questions.length, 50);
   for (const q of questions) {
-    assert.ok(validOps.has(q.operation), `Operation ${q.operation} must be valid`);
+    if (q.operation === 'multiplication') {
+      assert.ok(selectedTables.includes(q.num1), `Multiplication table ${q.num1} must be in [12, 13]`);
+    } else if (q.operation === 'square') {
+      assert.ok(q.num1 <= 30, `Square base ${q.num1} must be <= 30`);
+    } else if (q.operation === 'cube') {
+      assert.ok(q.num1 <= 15, `Cube base ${q.num1} must be <= 15`);
+    } else {
+      assert.fail(`Invalid operation: ${q.operation}`);
+    }
   }
 });
 

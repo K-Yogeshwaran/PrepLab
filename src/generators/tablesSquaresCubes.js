@@ -2,10 +2,10 @@
  * Question generator for "Tables, Squares & Cubes" (Module 02)
  *
  * Fully deterministic JavaScript generator supporting:
- * - Multiplication Tables (1-20): 20-Line Memorization (n × 1 ... n × 20) & Random Speed Drill
- * - Squares (1-50): 1² ... 50²
- * - Cubes (1-25): 1³ ... 25³
- * - Mixed Practice: Blend of tables, squares, and cubes
+ * - Multiplication Tables (1-20): 20-Line Memorization & Multi-Table Speed Drills
+ * - Squares (1-50): Configurable range (1-20, 1-30, 1-40, 1-50)
+ * - Cubes (1-25): Configurable range (1-10, 1-15, 1-20, 1-25)
+ * - Mixed Practice: Blend of tables, squares, and cubes within configured study scopes
  */
 
 function randomInt(min, max) {
@@ -13,23 +13,34 @@ function randomInt(min, max) {
 }
 
 /**
- * Generate multiplication question (tables 1-20)
+ * Generate multiplication question
+ * @param {Array<number>|number} tables - Selected table or array of tables (e.g., [12, 13, 14])
+ * @param {string} subMode - 'memorization' or 'speed'
+ * @param {number} step - Step index (1..20) for 20-line memorization
  */
-function generateMultiplicationQuestion(tableChoice = 17, subMode = 'memorization', step = 1) {
-  let table = parseInt(tableChoice, 10) || 17;
+function generateMultiplicationQuestion(tables = [17], subMode = 'memorization', step = 1) {
+  const tableList = Array.isArray(tables)
+    ? tables.map((t) => parseInt(t, 10)).filter((t) => !isNaN(t) && t >= 1 && t <= 20)
+    : [parseInt(tables, 10) || 17];
+
+  const safeTableList = tableList.length > 0 ? tableList : [17];
+
+  let selectedTable;
   let multiplier;
 
   if (subMode === 'memorization') {
-    // 20-Line Memorization: strictly step 1 to 20
+    // 20-Line Memorization uses single selected table (first in list)
+    selectedTable = safeTableList[0];
     multiplier = Math.min(Math.max(step, 1), 20);
   } else {
-    // Speed drill for selected table
+    // Random Speed Drill picks randomly ONLY from the selected tables list
+    selectedTable = safeTableList[randomInt(0, safeTableList.length - 1)];
     multiplier = randomInt(1, 20);
   }
 
-  const num1 = table;
+  const num1 = selectedTable;
   const num2 = multiplier;
-  const correctAnswer = table * multiplier;
+  const correctAnswer = num1 * num2;
 
   return {
     question: `${num1} × ${num2}`,
@@ -42,10 +53,11 @@ function generateMultiplicationQuestion(tableChoice = 17, subMode = 'memorizatio
 }
 
 /**
- * Generate square question (1-50)
+ * Generate square question within max range
  */
-function generateSquareQuestion() {
-  const num = randomInt(1, 50);
+function generateSquareQuestion(maxRange = 50) {
+  const max = Math.min(Math.max(parseInt(maxRange, 10) || 50, 1), 50);
+  const num = randomInt(1, max);
   const correctAnswer = num * num;
 
   return {
@@ -59,10 +71,11 @@ function generateSquareQuestion() {
 }
 
 /**
- * Generate cube question (1-25)
+ * Generate cube question within max range
  */
-function generateCubeQuestion() {
-  const num = randomInt(1, 25);
+function generateCubeQuestion(maxRange = 25) {
+  const max = Math.min(Math.max(parseInt(maxRange, 10) || 25, 1), 25);
+  const num = randomInt(1, max);
   const correctAnswer = num * num * num;
 
   return {
@@ -76,29 +89,28 @@ function generateCubeQuestion() {
 }
 
 /**
- * Single question factory
+ * Single question factory respecting configured study scopes
  */
-function generateSingleQuestion(index, mode, table, subMode) {
+function generateSingleQuestion(index, mode, tables, subMode, squareMax, cubeMax) {
   let item;
 
   if (mode === 'tables') {
-    item = generateMultiplicationQuestion(table, subMode, index);
+    item = generateMultiplicationQuestion(tables, subMode, index);
   } else if (mode === 'squares') {
-    item = generateSquareQuestion();
+    item = generateSquareQuestion(squareMax);
   } else if (mode === 'cubes') {
-    item = generateCubeQuestion();
+    item = generateCubeQuestion(cubeMax);
   } else {
     // Mixed Mode: pick randomly among multiplication, square, cube
     const choices = ['multiplication', 'square', 'cube'];
     const selectedOp = choices[randomInt(0, choices.length - 1)];
 
     if (selectedOp === 'multiplication') {
-      const randomTable = randomInt(1, 20);
-      item = generateMultiplicationQuestion(randomTable, 'speed', index);
+      item = generateMultiplicationQuestion(tables, 'speed', index);
     } else if (selectedOp === 'square') {
-      item = generateSquareQuestion();
+      item = generateSquareQuestion(squareMax);
     } else {
-      item = generateCubeQuestion();
+      item = generateCubeQuestion(cubeMax);
     }
   }
 
@@ -120,7 +132,7 @@ export const tablesSquaresCubesTopic = {
   name: 'Tables, Squares & Cubes',
   category: 'Speed Math',
   description:
-    'Master multiplication tables (1-20), squares (1-50), and cubes (1-25) through 20-line memorization, speed drills, and mixed practice.',
+    'Master multiplication tables (1-20), squares (1-50), and cubes (1-25) through 20-line memorization, multi-table speed drills, and configured study scopes.',
 
   config: {
     modes: [
@@ -133,14 +145,30 @@ export const tablesSquaresCubesTopic = {
 
     tableSubModes: [
       { id: 'memorization', label: '20-Line Memorization', description: 'Sequential n × 1 through n × 20' },
-      { id: 'speed', label: 'Random Speed Drill', description: 'Randomized multiplier drills for table n' },
+      { id: 'speed', label: 'Random Speed Drill', description: 'Multi-table random speed drills' },
     ],
     defaultTableSubMode: 'memorization',
 
     tables: Array.from({ length: 20 }, (_, i) => i + 1),
     defaultTable: 17,
 
-    questionCounts: [5, 10, 15, 20, 25, 50],
+    squareRanges: [
+      { id: 20, label: '1–20' },
+      { id: 30, label: '1–30' },
+      { id: 40, label: '1–40' },
+      { id: 50, label: '1–50' },
+    ],
+    defaultSquareMax: 50,
+
+    cubeRanges: [
+      { id: 10, label: '1–10' },
+      { id: 15, label: '1–15' },
+      { id: 20, label: '1–20' },
+      { id: 25, label: '1–25' },
+    ],
+    defaultCubeMax: 25,
+
+    questionCounts: [5, 10, 15, 20, 25, 50, 100],
     defaultCount: 20,
   },
 
@@ -151,7 +179,10 @@ export const tablesSquaresCubesTopic = {
     count = 20,
     mode = 'tables',
     table = 17,
+    tables = [17],
     subMode = 'memorization',
+    squareMax = 50,
+    cubeMax = 25,
   } = {}) {
     const questions = [];
     const seenSignatures = new Set();
@@ -160,13 +191,18 @@ export const tablesSquaresCubesTopic = {
     const isMemorization = mode === 'tables' && subMode === 'memorization';
     const targetCount = isMemorization ? 20 : Math.max(1, parseInt(count, 10) || 20);
 
+    // Resolve table list
+    const targetTables = Array.isArray(tables) && tables.length > 0
+      ? tables
+      : [table || 17];
+
     for (let i = 1; i <= targetCount; i++) {
       let candidate;
       let signature;
       let attempts = 0;
 
       do {
-        candidate = generateSingleQuestion(i, mode, table, subMode);
+        candidate = generateSingleQuestion(i, mode, targetTables, subMode, squareMax, cubeMax);
         signature = candidate.question;
         attempts++;
       } while (!isMemorization && seenSignatures.has(signature) && attempts < 40);
